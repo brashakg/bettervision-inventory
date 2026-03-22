@@ -49,6 +49,9 @@ public/uploads/*
 # standalone output
 .next/standalone/
 
+# Docker (not using Dockerfile for Railway)
+Dockerfile
+
 # typescript build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo
