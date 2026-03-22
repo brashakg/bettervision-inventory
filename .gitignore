@@ -48,3 +48,7 @@ public/uploads/*
 
 # standalone output
 .next/standalone/
+
+# typescript build info
+tsconfig.tsbuildinfo
+*.tsbuildinfo
