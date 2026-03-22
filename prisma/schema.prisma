@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  password   String
+  name       String
+  role       String   @default("CATALOG_MANAGER") // ADMIN, DESIGN_MANAGER, CATALOG_MANAGER
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  products   Product[]
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  products  ProductLocation[]
+  variants  VariantLocation[]
+}
+
+model AttributeType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  label     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  options   AttributeOption[]
+}
+
+model AttributeOption {
+  id              String        @id @default(cuid())
+  attributeTypeId String
+  attributeType   AttributeType @relation(fields: [attributeTypeId], references: [id], onDelete: Cascade)
+  value           String
+  sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  @@unique([attributeTypeId, value])
+}
+
+model DiscountRule {
+  id                 String   @id @default(cuid())
+  category           String   @unique
+  discountPercentage Float
+  createdAt          DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────
+// PRODUCT = Parent/Master product (e.g. "BOSS 1234")
+// Holds shared attributes: brand, modelNo, shape, material, gender, etc.
+// Each unique color+size combo lives in ProductVariant.
+// ─────────────────────────────────────────────────────────
+model Product {
+  id               String   @id @default(cuid())
+  category         String   // SPECTACLES, SUNGLASSES, SOLUTIONS
+  status           String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  shopifyProductId String?
+
+  // Brand & Identity
+  brand       String
+  subBrand    String?
+  label       String?
+  productName String?
+  modelNo     String?
+  fullModelNo String?
+
+  // Frame Attributes (shared across variants)
+  shape          String?
+  frameMaterial  String?
+  templeMaterial String?
+  frameType      String?
+
+  // Demographics & Origin
+  gender          String?
+  countryOfOrigin String?
+  warranty        String?
+
+  // Lens Attributes (Sunglasses — shared base)
+  lensMaterial String?
+  lensUSP      String?
+  polarization String?
+  uvProtection String?
+
+  // Product USP
+  productUSP String?
+
+  // Solutions-specific fields
+  recommendedFor String?
+  instructions   String?
+  ingredients    String?
+  benefits       String?
+  aboutProduct   String?
+
+  // Base Pricing (default for variants that don't override)
+  mrp             Float    @default(0)
+  discountedPrice Float    @default(0)
+  compareAtPrice  Float    @default(0)
+
+  // Auto-generated fields
+  title           String?
+  sku             String?  @unique
+  seoTitle        String?
+  seoDescription  String?
+  pageUrl         String?
+  tags            String?
+  htmlDescription String?
+
+  // Identifiers
+  gtin String?
+  upc  String?
+
+  // ── LEGACY fields (kept for backward compat with existing data) ──
+  // These move to ProductVariant for new products
+  colorCode   String?
+  frameColor  String?
+  templeColor String?
+  frameSize   String?
+  bridge      String?
+  templeLength String?
+  weight      String?
+  lensColour  String?
+  tint        String?
+
+  // Relations
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  images      ProductImage[]
+  locations   ProductLocation[]
+  syncLogs    SyncLog[]
+  variants    ProductVariant[]
+  collections CollectionProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────
+// PRODUCT VARIANT = Specific color + size combination
+// e.g. BOSS 1234 → variant "086 / 55", "086 / 52", "567 / 55"
+// Maps 1:1 to a Shopify Variant.
+// ─────────────────────────────────────────────────────────
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Variant-defining attributes
+  colorCode   String   // e.g. "086", "567", "432"
+  colorName   String?  // Human-readable: "Black", "Havana", etc.
+  frameColor  String?  // Detailed frame color
+  templeColor String?
+  frameSize   String?  // e.g. "55", "52"
+  bridge      String?
+  templeLength String?
+  weight      String?
+
+  // Lens (may vary by color for sunglasses)
+  lensColour String?
+  tint       String?
+
+  // Variant-level pricing (overrides parent if set)
+  mrp             Float   @default(0)
+  discountedPrice Float   @default(0)
+  compareAtPrice  Float   @default(0)
+
+  // Auto-generated
+  sku     String? @unique  // e.g. "SP-BOSS-1234-086-55"
+  barcode String?          // GTIN/UPC for this specific variant
+  title   String?          // e.g. "086 / 55" or "Black / 55"
+
+  // Shopify sync
+  shopifyVariantId String?
+
+  // Relations
+  images    VariantImage[]
+  locations VariantLocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, colorCode, frameSize])
+}
+
+model VariantImage {
+  id             String         @id @default(cuid())
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  url            String
+  originalUrl    String?
+  position       Int            @default(0)
+  shopifyMediaId String?
+  isProcessed    Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+}
+
+model VariantLocation {
+  id         String         @id @default(cuid())
+  variantId  String
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  quantity   Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([variantId, locationId])
+}
+
+model ProductImage {
+  id             String   @id @default(cuid())
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url            String
+  originalUrl    String?
+  position       Int      @default(0)
+  shopifyMediaId String?
+  isProcessed    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model ProductLocation {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  quantity   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, locationId])
+}
+
+model SyncLog {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  action    String   // CREATE, UPDATE, DELETE, STOCK_UPDATE, VARIANT_CREATE, VARIANT_UPDATE
+  status    String   // SUCCESS, FAILED, PENDING
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────
+// COLLECTION — synced from Shopify, editable locally
+// Maps to Shopify Custom/Smart Collections
+// ─────────────────────────────────────────────────────────
+model Collection {
+  id                   String   @id @default(cuid())
+  shopifyCollectionId  String   @unique
+  title                String
+  handle               String?
+  description          String?
+  descriptionHtml      String?
+  collectionType       String   @default("CUSTOM") // CUSTOM, SMART
+  sortOrder            String?  // e.g. BEST_SELLING, ALPHA_ASC, PRICE_DESC, MANUAL
+  templateSuffix       String?
+  imageUrl             String?
+  imageAlt             String?
+  seoTitle             String?
+  seoDescription       String?
+  published            Boolean  @default(true)
+  productsCount        Int      @default(0)
+
+  // Smart collection rules (JSON string for SMART collections)
+  rules                String?  // JSON array of rules
+  disjunctive          Boolean  @default(false) // true = any rule, false = all rules
+
+  // Local edits tracking
+  locallyModified      Boolean  @default(false)
+  lastSyncedAt         DateTime?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  products             CollectionProduct[]
+}
+
+model CollectionProduct {
+  id           String     @id @default(cuid())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position     Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@unique([collectionId, productId])
+}
