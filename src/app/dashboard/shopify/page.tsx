@@ -55,7 +55,7 @@ export default function ShopifySettingsPage() {
 
       // Test the Shopify API connection
       const response = await fetch(
-        `https://${formData.storeUrl}/admin/api/2024-01/graphql.json`,
+        `https://${formData.storeUrl}/admin/api/2026-01/graphql.json`,
         {
           method: "POST",
           headers: {

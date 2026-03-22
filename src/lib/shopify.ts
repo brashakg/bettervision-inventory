@@ -15,16 +15,18 @@ async function getAccessToken(): Promise<string> {
       `${SHOPIFY_STORE_URL}/admin/oauth/access_token`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
           client_id: SHOPIFY_CLIENT_ID,
           client_secret: SHOPIFY_CLIENT_SECRET,
           grant_type: "client_credentials",
-        }),
+        }).toString(),
       }
     );
     if (!response.ok) {
-      throw new Error(`OAuth token request failed: HTTP ${response.status}`);
+      const errorBody = await response.text();
+      console.error(`OAuth token request failed: HTTP ${response.status}`, errorBody);
+      throw new Error(`OAuth token request failed: HTTP ${response.status} - ${errorBody}`);
     }
     const data = await response.json();
     cachedToken = {
@@ -58,7 +60,7 @@ async function makeGraphQLRequest<T>(
   try {
     const accessToken = await getAccessToken();
     const response = await fetch(
-      `${SHOPIFY_STORE_URL}/admin/api/2025-01/graphql.json`,
+      `${SHOPIFY_STORE_URL}/admin/api/2026-01/graphql.json`,
       {
         method: "POST",
         headers: {
