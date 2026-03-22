@@ -779,7 +779,8 @@ export async function fetchAllProducts(): Promise<{
   }
 
   while (hasNextPage) {
-    const result = await makeGraphQLRequest<ProductsResponse>(query, { cursor });
+    const result: { success: boolean; data?: ProductsResponse; error?: string } =
+      await makeGraphQLRequest<ProductsResponse>(query, { cursor });
     if (!result.success || !result.data) {
       return { success: false, error: result.error || "Failed to fetch products" };
     }

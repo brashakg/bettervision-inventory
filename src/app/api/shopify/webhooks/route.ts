@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
     // Determine callback URL from environment
     const baseUrl =
       process.env.NEXTAUTH_URL ||
-      process.env.RAILWAY_PUBLIC_DOMAIN
+      (process.env.RAILWAY_PUBLIC_DOMAIN
         ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-        : "http://localhost:3000";
+        : "http://localhost:3000");
     const callbackUrl = `${baseUrl}/api/webhooks/shopify`;
 
     if (action === "register_all") {
