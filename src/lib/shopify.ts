@@ -668,6 +668,320 @@ export async function removeProductsFromCollection(
   return { success: true, message: "Products removed from collection" };
 }
 
+// ─── FETCH ALL PRODUCTS FROM SHOPIFY ──────────────────
+
+export interface ShopifyProductNode {
+  id: string;
+  title: string;
+  handle: string;
+  descriptionHtml: string;
+  status: string;
+  vendor: string;
+  productType: string;
+  tags: string[];
+  totalInventory: number;
+  createdAt: string;
+  updatedAt: string;
+  seo: { title: string | null; description: string | null };
+  featuredImage: { url: string; altText: string | null } | null;
+  images: {
+    edges: Array<{
+      node: { id: string; url: string; altText: string | null };
+    }>;
+  };
+  variants: {
+    edges: Array<{
+      node: {
+        id: string;
+        title: string;
+        sku: string | null;
+        price: string;
+        compareAtPrice: string | null;
+        barcode: string | null;
+        inventoryQuantity: number;
+        selectedOptions: Array<{ name: string; value: string }>;
+        inventoryItem: { id: string };
+      };
+    }>;
+  };
+  metafields: {
+    edges: Array<{
+      node: { namespace: string; key: string; value: string; type: string };
+    }>;
+  };
+}
+
+export async function fetchAllProducts(): Promise<{
+  success: boolean;
+  products?: ShopifyProductNode[];
+  error?: string;
+}> {
+  const query = `
+    query FetchProducts($cursor: String) {
+      products(first: 50, after: $cursor) {
+        edges {
+          cursor
+          node {
+            id
+            title
+            handle
+            descriptionHtml
+            status
+            vendor
+            productType
+            tags
+            totalInventory
+            createdAt
+            updatedAt
+            seo { title description }
+            featuredImage { url altText }
+            images(first: 20) {
+              edges {
+                node { id url altText }
+              }
+            }
+            variants(first: 100) {
+              edges {
+                node {
+                  id
+                  title
+                  sku
+                  price
+                  compareAtPrice
+                  barcode
+                  inventoryQuantity
+                  selectedOptions { name value }
+                  inventoryItem { id }
+                }
+              }
+            }
+            metafields(first: 20) {
+              edges {
+                node { namespace key value type }
+              }
+            }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  `;
+
+  const allProducts: ShopifyProductNode[] = [];
+  let cursor: string | null = null;
+  let hasNextPage = true;
+
+  interface ProductsResponse {
+    products: {
+      edges: Array<{ cursor: string; node: ShopifyProductNode }>;
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    };
+  }
+
+  while (hasNextPage) {
+    const result = await makeGraphQLRequest<ProductsResponse>(query, { cursor });
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Failed to fetch products" };
+    }
+    for (const edge of result.data.products.edges) {
+      allProducts.push(edge.node);
+    }
+    hasNextPage = result.data.products.pageInfo.hasNextPage;
+    cursor = result.data.products.pageInfo.endCursor || null;
+  }
+
+  return { success: true, products: allProducts };
+}
+
+export async function fetchProductByShopifyId(shopifyGid: string): Promise<{
+  success: boolean;
+  product?: ShopifyProductNode;
+  error?: string;
+}> {
+  const query = `
+    query FetchProduct($id: ID!) {
+      product(id: $id) {
+        id
+        title
+        handle
+        descriptionHtml
+        status
+        vendor
+        productType
+        tags
+        totalInventory
+        createdAt
+        updatedAt
+        seo { title description }
+        featuredImage { url altText }
+        images(first: 20) {
+          edges {
+            node { id url altText }
+          }
+        }
+        variants(first: 100) {
+          edges {
+            node {
+              id
+              title
+              sku
+              price
+              compareAtPrice
+              barcode
+              inventoryQuantity
+              selectedOptions { name value }
+              inventoryItem { id }
+            }
+          }
+        }
+        metafields(first: 20) {
+          edges {
+            node { namespace key value type }
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{ product: ShopifyProductNode }>(query, { id: shopifyGid });
+  if (!result.success || !result.data?.product) {
+    return { success: false, error: result.error || "Product not found" };
+  }
+  return { success: true, product: result.data.product };
+}
+
+// ─── WEBHOOK SUBSCRIPTIONS ────────────────────────────
+
+export interface WebhookSubscriptionNode {
+  id: string;
+  topic: string;
+  endpoint: {
+    __typename: string;
+    callbackUrl?: string;
+  };
+  format: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function registerWebhook(
+  topic: string,
+  callbackUrl: string
+): Promise<{ success: boolean; webhookId?: string; error?: string }> {
+  const mutation = `
+    mutation WebhookCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+      webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+        webhookSubscription {
+          id
+          topic
+          endpoint {
+            __typename
+            ... on WebhookHttpEndpoint {
+              callbackUrl
+            }
+          }
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{
+    webhookSubscriptionCreate: {
+      webhookSubscription: { id: string; topic: string } | null;
+      userErrors: Array<{ field: string; message: string }>;
+    };
+  }>(mutation, {
+    topic,
+    webhookSubscription: {
+      callbackUrl,
+      format: "JSON",
+    },
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error || "Failed to register webhook" };
+  }
+  const errors = result.data?.webhookSubscriptionCreate.userErrors || [];
+  if (errors.length > 0) {
+    return { success: false, error: errors.map((e) => `${e.field}: ${e.message}`).join("; ") };
+  }
+  const webhook = result.data?.webhookSubscriptionCreate.webhookSubscription;
+  return { success: true, webhookId: webhook?.id };
+}
+
+export async function listWebhooks(): Promise<{
+  success: boolean;
+  webhooks?: WebhookSubscriptionNode[];
+  error?: string;
+}> {
+  const query = `
+    query ListWebhooks {
+      webhookSubscriptions(first: 50) {
+        edges {
+          node {
+            id
+            topic
+            endpoint {
+              __typename
+              ... on WebhookHttpEndpoint {
+                callbackUrl
+              }
+            }
+            format
+            createdAt
+            updatedAt
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{
+    webhookSubscriptions: {
+      edges: Array<{ node: WebhookSubscriptionNode }>;
+    };
+  }>(query);
+
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "Failed to list webhooks" };
+  }
+
+  return {
+    success: true,
+    webhooks: result.data.webhookSubscriptions.edges.map((e) => e.node),
+  };
+}
+
+export async function deleteWebhook(
+  webhookId: string
+): Promise<{ success: boolean; error?: string }> {
+  const mutation = `
+    mutation WebhookDelete($id: ID!) {
+      webhookSubscriptionDelete(id: $id) {
+        deletedWebhookSubscriptionId
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{
+    webhookSubscriptionDelete: {
+      deletedWebhookSubscriptionId: string | null;
+      userErrors: Array<{ field: string; message: string }>;
+    };
+  }>(mutation, { id: webhookId });
+
+  if (!result.success) {
+    return { success: false, error: result.error || "Failed to delete webhook" };
+  }
+  const errors = result.data?.webhookSubscriptionDelete.userErrors || [];
+  if (errors.length > 0) {
+    return { success: false, error: errors.map((e) => `${e.field}: ${e.message}`).join("; ") };
+  }
+  return { success: true };
+}
+
 // ─── PRODUCT METAFIELDS ────────────────────────────────
 
 export async function setProductMetafields(

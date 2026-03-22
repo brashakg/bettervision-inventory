@@ -303,3 +303,34 @@ model CollectionProduct {
 
   @@unique([collectionId, productId])
 }
+
+// ─────────────────────────────────────────────────────────
+// WEBHOOK EVENT — logs incoming Shopify webhook events
+// Used for audit trail and debugging real-time sync
+// ─────────────────────────────────────────────────────────
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  topic     String   // e.g. "products/update", "orders/create", "inventory_levels/update"
+  shopifyId String?  // Shopify resource ID from the event
+  payload   String?  // JSON string of the webhook payload (truncated)
+  status    String   @default("RECEIVED") // RECEIVED, PROCESSED, FAILED, IGNORED
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@index([topic, createdAt])
+  @@index([shopifyId])
+}
+
+// ─────────────────────────────────────────────────────────
+// WEBHOOK SUBSCRIPTION — tracks registered webhook subscriptions
+// ─────────────────────────────────────────────────────────
+model WebhookSubscription {
+  id              String   @id @default(cuid())
+  shopifyWebhookId String  @unique
+  topic           String   // e.g. "PRODUCTS_UPDATE"
+  callbackUrl     String
+  format          String   @default("JSON")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
