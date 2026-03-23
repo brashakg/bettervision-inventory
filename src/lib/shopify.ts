@@ -1021,3 +1021,141 @@ export async function setProductMetafields(
   }
   return { success: true, message: "Metafields set successfully" };
 }
+
+// ─── FILE UPLOAD via Shopify Staged Uploads ───────────────
+
+interface StagedTarget {
+  url: string;
+  resourceUrl: string;
+  parameters: Array<{ name: string; value: string }>;
+}
+
+/**
+ * Upload a file to Shopify's CDN using the Staged Uploads API.
+ * Returns the permanent CDN URL on success.
+ */
+export async function uploadFileToShopify(
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    // Step 1: Create a staged upload target
+    const stageMutation = `
+      mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+        stagedUploadsCreate(input: $input) {
+          stagedTargets {
+            url
+            resourceUrl
+            parameters { name value }
+          }
+          userErrors { field message }
+        }
+      }
+    `;
+
+    const stageResult = await makeGraphQLRequest<{
+      stagedUploadsCreate: {
+        stagedTargets: StagedTarget[];
+        userErrors: Array<{ field: string; message: string }>;
+      };
+    }>(stageMutation, {
+      input: [
+        {
+          filename: fileName,
+          mimeType,
+          resource: "FILE",
+          httpMethod: "POST",
+          fileSize: String(fileBuffer.length),
+        },
+      ],
+    });
+
+    if (!stageResult.success || !stageResult.data) {
+      return { success: false, error: stageResult.error || "Failed to create staged upload" };
+    }
+
+    const stageErrors = stageResult.data.stagedUploadsCreate.userErrors;
+    if (stageErrors.length > 0) {
+      return { success: false, error: stageErrors.map((e) => e.message).join("; ") };
+    }
+
+    const target = stageResult.data.stagedUploadsCreate.stagedTargets[0];
+    if (!target) {
+      return { success: false, error: "No staged target returned" };
+    }
+
+    // Step 2: Upload the file to the staged target URL
+    const formData = new FormData();
+    for (const param of target.parameters) {
+      formData.append(param.name, param.value);
+    }
+    formData.append("file", new Blob([new Uint8Array(fileBuffer)], { type: mimeType }), fileName);
+
+    const uploadResponse = await fetch(target.url, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error("Staged upload POST failed:", uploadResponse.status, errorText);
+      return { success: false, error: `Upload to staging failed: ${uploadResponse.status}` };
+    }
+
+    // Step 3: Create a file record in Shopify pointing to the staged resource
+    const fileCreateMutation = `
+      mutation fileCreate($files: [FileCreateInput!]!) {
+        fileCreate(files: $files) {
+          files {
+            ... on MediaImage {
+              id
+              image { url }
+            }
+            ... on GenericFile {
+              id
+              url
+            }
+          }
+          userErrors { field message }
+        }
+      }
+    `;
+
+    const fileResult = await makeGraphQLRequest<{
+      fileCreate: {
+        files: Array<{
+          id: string;
+          image?: { url: string };
+          url?: string;
+        }>;
+        userErrors: Array<{ field: string; message: string }>;
+      };
+    }>(fileCreateMutation, {
+      files: [
+        {
+          originalSource: target.resourceUrl,
+          contentType: "IMAGE",
+        },
+      ],
+    });
+
+    if (!fileResult.success || !fileResult.data) {
+      return { success: false, error: fileResult.error || "Failed to create file in Shopify" };
+    }
+
+    const fileErrors = fileResult.data.fileCreate.userErrors;
+    if (fileErrors.length > 0) {
+      return { success: false, error: fileErrors.map((e) => e.message).join("; ") };
+    }
+
+    const createdFile = fileResult.data.fileCreate.files[0];
+    const cdnUrl = createdFile?.image?.url || createdFile?.url || target.resourceUrl;
+
+    return { success: true, url: cdnUrl };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("uploadFileToShopify error:", msg);
+    return { success: false, error: msg };
+  }
+}

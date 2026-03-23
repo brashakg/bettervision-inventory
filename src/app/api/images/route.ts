@@ -4,6 +4,7 @@ import { join } from "path";
 import { randomBytes } from "crypto";
 import { requireAuth } from "@/lib/apiAuth";
 import { logActivity } from "@/lib/activityLog";
+import { uploadFileToShopify } from "@/lib/shopify";
 
 const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
 const REMOVEBG_API_KEY = process.env.REMOVEBG_API_KEY;
@@ -82,30 +83,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await ensureUploadDir();
-
     const buffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(buffer);
 
     const fileName = `${randomBytes(8).toString("hex")}-${Date.now()}.${
       file.type.split("/")[1] || "png"
     }`;
-    const filePath = join(UPLOAD_DIR, fileName);
 
-    await writeFile(filePath, fileBuffer);
+    const urls: Record<string, string> = {};
 
-    const urls: Record<string, string> = {
-      original: `/uploads/${fileName}`,
-    };
+    // Try uploading to Shopify CDN first (persistent storage)
+    const shopifyResult = await uploadFileToShopify(fileBuffer, fileName, file.type);
 
+    if (shopifyResult.success && shopifyResult.url) {
+      urls.original = shopifyResult.url;
+      console.log("Image uploaded to Shopify CDN:", shopifyResult.url);
+    } else {
+      // Fallback: save locally (works for dev, ephemeral on Railway)
+      console.warn("Shopify upload failed, falling back to local:", shopifyResult.error);
+      await ensureUploadDir();
+      const filePath = join(UPLOAD_DIR, fileName);
+      await writeFile(filePath, fileBuffer);
+      urls.original = `/uploads/${fileName}`;
+    }
+
+    // Background removal (if configured)
     if (REMOVEBG_API_KEY) {
       const processedBuffer = await removeBackground(fileBuffer);
 
       if (processedBuffer) {
         const processedFileName = `${randomBytes(8).toString("hex")}-${Date.now()}-nobg.png`;
-        const processedPath = join(UPLOAD_DIR, processedFileName);
-        await writeFile(processedPath, processedBuffer);
-        urls.processed = `/uploads/${processedFileName}`;
+
+        // Try uploading processed image to Shopify too
+        const processedShopifyResult = await uploadFileToShopify(
+          processedBuffer,
+          processedFileName,
+          "image/png"
+        );
+
+        if (processedShopifyResult.success && processedShopifyResult.url) {
+          urls.processed = processedShopifyResult.url;
+        } else {
+          // Fallback: save locally
+          await ensureUploadDir();
+          const processedPath = join(UPLOAD_DIR, processedFileName);
+          await writeFile(processedPath, processedBuffer);
+          urls.processed = `/uploads/${processedFileName}`;
+        }
       }
     }
 
@@ -117,7 +141,7 @@ export async function POST(request: NextRequest) {
       action: "UPLOAD",
       entity: "IMAGE",
       entityId: fileName,
-      details: `Uploaded image: ${file.name} (${(fileBuffer.length / 1024).toFixed(1)}KB)`,
+      details: `Uploaded image: ${file.name} (${(fileBuffer.length / 1024).toFixed(1)}KB) → ${shopifyResult.success ? 'Shopify CDN' : 'local'}`,
     });
 
     return NextResponse.json(
@@ -127,6 +151,7 @@ export async function POST(request: NextRequest) {
           fileName,
           urls,
           size: fileBuffer.length,
+          storage: shopifyResult.success ? "shopify_cdn" : "local",
         },
         message: "Image uploaded successfully",
       },
