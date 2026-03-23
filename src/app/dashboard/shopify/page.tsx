@@ -96,30 +96,52 @@ export default function ShopifySettingsPage() {
     }
   }, [activeTab, fetchWebhooks]);
 
-  // ── Pull products FROM Shopify ──
-  const handlePullFromShopify = async () => {
-    try {
-      setPulling(true);
-      setError(null);
-      setSuccess(null);
+  // ── Pull products FROM Shopify (runs in background) ──
+  const handlePullFromShopify = () => {
+    setPulling(true);
+    setError(null);
+    setSuccess("Pull started! This runs in the background — you can navigate away. A notification will appear when complete.");
 
-      const res = await fetch("/api/shopify/pull", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+    // Fire the pull in the background — don't block the UI
+    fetch("/api/shopify/pull", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setSuccess(data.message);
+          fetchAll();
+          // Browser notification if permission granted
+          if (Notification.permission === "granted") {
+            new Notification("Shopify Pull Complete", {
+              body: data.message,
+              icon: "/app-icon.png",
+            });
+          }
+        } else {
+          setError(data.error || "Pull failed");
+          setSuccess(null);
+          if (Notification.permission === "granted") {
+            new Notification("Shopify Pull Failed", {
+              body: data.error || "Pull failed",
+              icon: "/app-icon.png",
+            });
+          }
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Pull failed");
+        setSuccess(null);
+      })
+      .finally(() => {
+        setPulling(false);
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setSuccess(data.message);
-        await fetchAll();
-      } else {
-        setError(data.error || "Pull failed");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Pull failed");
-    } finally {
-      setPulling(false);
+    // Request notification permission for future pulls
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
     }
   };
 
@@ -438,7 +460,7 @@ export default function ShopifySettingsPage() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                         />
                       </svg>
-                      Pulling Products...
+                      Pulling in background...
                     </span>
                   ) : (
                     "Pull All Products from Shopify"
