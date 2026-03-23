@@ -71,7 +71,7 @@ const mockLocations: Location[] = [
   },
 ];
 
-export async function GET(request: NextRequest): Promise<NextResponse<Location[]>> {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const active = searchParams.get('active');

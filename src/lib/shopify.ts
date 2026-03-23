@@ -53,7 +53,7 @@ interface GraphQLResponse<T> {
   errors?: GraphQLError[];
 }
 
-async function makeGraphQLRequest<T>(
+export async function makeGraphQLRequest<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<{ success: boolean; data?: T; error?: string }> {
