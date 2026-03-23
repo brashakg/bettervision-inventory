@@ -88,6 +88,7 @@ function toTitleCase(text: string): string {
 // Helper: parse Shopify tags into structured fields
 // Tags format: "brand_burberry", "shape_square", "framecolor_orochiaro", etc.
 function parseTagsToFields(tags: string[]): {
+  brand?: string;
   shape?: string;
   frameColor?: string;
   templeColor?: string;
@@ -135,8 +136,10 @@ function parseTagsToFields(tags: string[]): {
       parsed.weight = value; // Keep as-is (with unit like "27g")
     } else if (lowerPrefix === "gender") {
       parsed.gender = toTitleCase(value);
+    } else if (lowerPrefix === "brand") {
+      parsed.brand = toTitleCase(value);
     }
-    // Ignore: brand_xxx (we use vendor), other_xxx
+    // Ignore: other_xxx
   }
 
   return parsed;
@@ -150,7 +153,6 @@ async function upsertProduct(sp: ShopifyProductNode) {
   });
 
   const category = guessCategory(sp);
-  const brand = getMetafield(sp, "custom", "brand") || sp.vendor || "Unknown";
   const modelNo = getMetafield(sp, "custom", "model_no") || "";
 
   // Extract first variant price as base MRP
@@ -163,6 +165,29 @@ async function upsertProduct(sp: ShopifyProductNode) {
   // Parse tags to extract structured fields
   const parsedTags = parseTagsToFields(sp.tags);
 
+  // Brand priority: tag (brand_boss) > metafield > vendor (skip store name "Better Vision")
+  const vendorName = sp.vendor || "";
+  const isStoreName = vendorName.toLowerCase().includes("better vision") || vendorName.toLowerCase().includes("bettervision");
+  const brand =
+    parsedTags.brand ||
+    getMetafield(sp, "custom", "brand") ||
+    (isStoreName ? "" : vendorName) ||
+    "Unknown";
+
+  // Try to extract model number from title if metafield is empty
+  // Titles are often "BOSS 1234" or "PRADA PR 54XV" — strip the brand prefix
+  let effectiveModelNo = modelNo;
+  if (!effectiveModelNo && sp.title && brand && brand !== "Unknown") {
+    const titleUpper = sp.title.toUpperCase();
+    const brandUpper = brand.toUpperCase();
+    if (titleUpper.startsWith(brandUpper)) {
+      effectiveModelNo = sp.title.slice(brand.length).trim();
+    } else {
+      // Title might not start with brand, use the full title as model reference
+      effectiveModelNo = sp.title;
+    }
+  }
+
   // Build productData, only adding parsed tag values if the field is null/empty
   const productData: any = {
     shopifyProductId: sp.id,
@@ -170,7 +195,9 @@ async function upsertProduct(sp: ShopifyProductNode) {
     category,
     status: mapStatus(sp.status),
     brand,
-    modelNo: modelNo || null,
+    modelNo: effectiveModelNo || null,
+    fullModelNo: sp.title || null,
+    productName: sp.title || null,
     htmlDescription: sp.descriptionHtml || null,
     seoTitle: sp.seo?.title || null,
     seoDescription: sp.seo?.description || null,
