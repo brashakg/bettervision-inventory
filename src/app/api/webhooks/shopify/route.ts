@@ -153,10 +153,186 @@ async function handleInventoryUpdate(payload: any) {
   console.log("Inventory update:", payload);
 }
 
-// Handle order create
-async function handleOrderCreate(payload: any) {
-  // Log order for future order management features
-  console.log(`Order created: ${payload.name || payload.id}`);
+// Handle order create/update
+async function handleOrderCreateUpdate(payload: any) {
+  const shopifyOrderId = `gid://shopify/Order/${payload.id}`;
+
+  // Upsert customer if present
+  let customerId: string | null = null;
+  if (payload.customer) {
+    const c = payload.customer;
+    const shopifyCustomerId = `gid://shopify/Customer/${c.id}`;
+    const addr = c.default_address || {};
+    const customer = await prisma.customer.upsert({
+      where: { shopifyCustomerId },
+      update: {
+        email: c.email || null,
+        phone: c.phone || null,
+        firstName: c.first_name || null,
+        lastName: c.last_name || null,
+        ordersCount: c.orders_count || 0,
+        totalSpent: parseFloat(c.total_spent || "0"),
+        acceptsMarketing: c.accepts_marketing || false,
+        tags: c.tags || null,
+        note: c.note || null,
+        address1: addr.address1 || null,
+        city: addr.city || null,
+        state: addr.province || null,
+        zip: addr.zip || null,
+        country: addr.country || null,
+      },
+      create: {
+        shopifyCustomerId,
+        email: c.email || null,
+        phone: c.phone || null,
+        firstName: c.first_name || null,
+        lastName: c.last_name || null,
+        ordersCount: c.orders_count || 0,
+        totalSpent: parseFloat(c.total_spent || "0"),
+        acceptsMarketing: c.accepts_marketing || false,
+        tags: c.tags || null,
+        note: c.note || null,
+        address1: addr.address1 || null,
+        city: addr.city || null,
+        state: addr.province || null,
+        zip: addr.zip || null,
+        country: addr.country || null,
+      },
+    });
+    customerId = customer.id;
+  }
+
+  // Map financial and fulfillment statuses
+  const financialStatus = payload.financial_status || null;
+  const fulfillmentStatus = payload.fulfillment_status || null;
+  let orderStatus = "OPEN";
+  if (payload.cancelled_at) orderStatus = "CANCELLED";
+  else if (payload.closed_at) orderStatus = "CLOSED";
+
+  const orderData = {
+    shopifyOrderId,
+    orderNumber: payload.order_number ? String(payload.order_number) : null,
+    name: payload.name || null,
+    email: payload.email || null,
+    phone: payload.phone || null,
+    totalPrice: parseFloat(payload.total_price || "0"),
+    subtotalPrice: parseFloat(payload.subtotal_price || "0"),
+    totalTax: parseFloat(payload.total_tax || "0"),
+    totalDiscount: parseFloat(payload.total_discounts || "0"),
+    currency: payload.currency || "INR",
+    financialStatus,
+    fulfillmentStatus,
+    orderStatus,
+    customerId,
+    shippingAddress: payload.shipping_address ? JSON.stringify(payload.shipping_address) : null,
+    billingAddress: payload.billing_address ? JSON.stringify(payload.billing_address) : null,
+    note: payload.note || null,
+    tags: payload.tags || null,
+    source: payload.source_name || null,
+    cancelReason: payload.cancel_reason || null,
+    cancelledAt: payload.cancelled_at ? new Date(payload.cancelled_at) : null,
+    closedAt: payload.closed_at ? new Date(payload.closed_at) : null,
+    processedAt: payload.processed_at ? new Date(payload.processed_at) : null,
+  };
+
+  const existing = await prisma.order.findUnique({ where: { shopifyOrderId } });
+  let orderId: string;
+
+  if (existing) {
+    await prisma.order.update({ where: { shopifyOrderId }, data: orderData });
+    orderId = existing.id;
+    // Delete old line items and recreate
+    await prisma.orderLineItem.deleteMany({ where: { orderId } });
+  } else {
+    const order = await prisma.order.create({ data: orderData });
+    orderId = order.id;
+  }
+
+  // Create line items
+  if (payload.line_items) {
+    for (const li of payload.line_items) {
+      await prisma.orderLineItem.create({
+        data: {
+          orderId,
+          shopifyLineItemId: li.id ? String(li.id) : null,
+          productId: null,
+          variantId: null,
+          title: li.title || "Unknown",
+          variantTitle: li.variant_title || null,
+          sku: li.sku || null,
+          quantity: li.quantity || 1,
+          price: parseFloat(li.price || "0"),
+          totalDiscount: parseFloat(li.total_discount || "0"),
+        },
+      });
+    }
+  }
+}
+
+// Handle order cancellation
+async function handleOrderCancel(payload: any) {
+  const shopifyOrderId = `gid://shopify/Order/${payload.id}`;
+  await prisma.order.updateMany({
+    where: { shopifyOrderId },
+    data: {
+      orderStatus: "CANCELLED",
+      cancelReason: payload.cancel_reason || null,
+      cancelledAt: payload.cancelled_at ? new Date(payload.cancelled_at) : new Date(),
+    },
+  });
+}
+
+// Handle customer create/update
+async function handleCustomerCreateUpdate(payload: any) {
+  const shopifyCustomerId = `gid://shopify/Customer/${payload.id}`;
+  const addr = payload.default_address || {};
+
+  await prisma.customer.upsert({
+    where: { shopifyCustomerId },
+    update: {
+      email: payload.email || null,
+      phone: payload.phone || null,
+      firstName: payload.first_name || null,
+      lastName: payload.last_name || null,
+      ordersCount: payload.orders_count || 0,
+      totalSpent: parseFloat(payload.total_spent || "0"),
+      acceptsMarketing: payload.accepts_marketing || false,
+      verified: payload.verified_email || false,
+      tags: payload.tags || null,
+      note: payload.note || null,
+      address1: addr.address1 || null,
+      address2: addr.address2 || null,
+      city: addr.city || null,
+      state: addr.province || null,
+      zip: addr.zip || null,
+      country: addr.country || null,
+    },
+    create: {
+      shopifyCustomerId,
+      email: payload.email || null,
+      phone: payload.phone || null,
+      firstName: payload.first_name || null,
+      lastName: payload.last_name || null,
+      ordersCount: payload.orders_count || 0,
+      totalSpent: parseFloat(payload.total_spent || "0"),
+      acceptsMarketing: payload.accepts_marketing || false,
+      verified: payload.verified_email || false,
+      tags: payload.tags || null,
+      note: payload.note || null,
+      address1: addr.address1 || null,
+      address2: addr.address2 || null,
+      city: addr.city || null,
+      state: addr.province || null,
+      zip: addr.zip || null,
+      country: addr.country || null,
+    },
+  });
+}
+
+// Handle customer delete
+async function handleCustomerDelete(payload: any) {
+  const shopifyCustomerId = `gid://shopify/Customer/${payload.id}`;
+  await prisma.customer.deleteMany({ where: { shopifyCustomerId } });
 }
 
 // Handle collection events
@@ -274,7 +450,19 @@ export async function POST(request: NextRequest) {
           break;
         case "orders/create":
         case "orders/updated":
-          await handleOrderCreate(payload);
+        case "orders/fulfilled":
+        case "orders/paid":
+          await handleOrderCreateUpdate(payload);
+          break;
+        case "orders/cancelled":
+          await handleOrderCancel(payload);
+          break;
+        case "customers/create":
+        case "customers/update":
+          await handleCustomerCreateUpdate(payload);
+          break;
+        case "customers/delete":
+          await handleCustomerDelete(payload);
           break;
         case "collections/create":
         case "collections/update":
@@ -282,6 +470,14 @@ export async function POST(request: NextRequest) {
           break;
         case "collections/delete":
           await handleCollectionDelete(payload);
+          break;
+        case "fulfillments/create":
+        case "fulfillments/update":
+          // Fulfillment events are handled via order update
+          console.log(`Fulfillment event: ${topic} for order ${payload.order_id}`);
+          break;
+        case "app/uninstalled":
+          console.warn("App uninstalled from Shopify store!");
           break;
         default:
           console.log(`Unhandled webhook topic: ${topic}`);

@@ -334,3 +334,148 @@ model WebhookSubscription {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+// ─────────────────────────────────────────────────────────
+// ORDER — synced from Shopify
+// ─────────────────────────────────────────────────────────
+model Order {
+  id                String   @id @default(cuid())
+  shopifyOrderId    String?  @unique
+  orderNumber       String?
+  name              String?  // e.g. "#1001"
+  email             String?
+  phone             String?
+
+  // Financials
+  totalPrice        Float    @default(0)
+  subtotalPrice     Float    @default(0)
+  totalTax          Float    @default(0)
+  totalDiscount     Float    @default(0)
+  currency          String   @default("INR")
+
+  // Status
+  financialStatus   String?  // paid, pending, refunded, partially_refunded
+  fulfillmentStatus String?  // fulfilled, partial, unfulfilled
+  orderStatus       String   @default("OPEN") // OPEN, CLOSED, CANCELLED
+
+  // Customer
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id])
+
+  // Shipping
+  shippingAddress   String?  // JSON
+  billingAddress    String?  // JSON
+
+  // Meta
+  note              String?
+  tags              String?
+  source            String?  // web, pos, mobile
+  cancelReason      String?
+  cancelledAt       DateTime?
+  closedAt          DateTime?
+  processedAt       DateTime?
+
+  // Relations
+  lineItems         OrderLineItem[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([orderStatus, createdAt])
+  @@index([customerId])
+}
+
+model OrderLineItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String?
+  variantId       String?
+  shopifyLineItemId String?
+  title           String
+  variantTitle    String?
+  sku             String?
+  quantity        Int     @default(1)
+  price           Float   @default(0)
+  totalDiscount   Float   @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────
+// CUSTOMER — synced from Shopify
+// ─────────────────────────────────────────────────────────
+model Customer {
+  id                String   @id @default(cuid())
+  shopifyCustomerId String?  @unique
+  email             String?
+  phone             String?
+  firstName         String?
+  lastName          String?
+
+  // Address
+  address1          String?
+  address2          String?
+  city              String?
+  state             String?
+  zip               String?
+  country           String?
+
+  // Stats
+  ordersCount       Int      @default(0)
+  totalSpent        Float    @default(0)
+
+  // Meta
+  tags              String?
+  note              String?
+  acceptsMarketing  Boolean  @default(false)
+  taxExempt         Boolean  @default(false)
+  verified          Boolean  @default(false)
+
+  // Relations
+  orders            Order[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+// ─────────────────────────────────────────────────────────
+// STOCK TRANSFER — transfer inventory between locations
+// ─────────────────────────────────────────────────────────
+model StockTransfer {
+  id              String   @id @default(cuid())
+  transferNumber  String   @unique
+  fromLocationId  String
+  toLocationId    String
+  status          String   @default("PENDING") // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
+  note            String?
+  createdById     String?
+
+  items           StockTransferItem[]
+
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model StockTransferItem {
+  id              String        @id @default(cuid())
+  transferId      String
+  transfer        StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  productId       String
+  variantId       String?
+  productTitle    String?
+  variantTitle    String?
+  quantity        Int           @default(1)
+
+  createdAt       DateTime      @default(now())
+
+  @@index([transferId])
+}
