@@ -25,6 +25,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ScrollText,
 } from "lucide-react";
 
 interface NavItem {
@@ -60,6 +61,7 @@ export default function Sidebar() {
     { href: "/dashboard/attributes", label: "Attributes", icon: <Tag className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/users", label: "Users", icon: <UserCog className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/locations", label: "Locations", icon: <MapPin className="w-5 h-5 flex-shrink-0" /> },
+    { href: "/dashboard/activity-logs", label: "Activity Logs", icon: <ScrollText className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/images", label: "Images", icon: <Image className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/shopify", label: "Shopify Sync", icon: <Settings className="w-5 h-5 flex-shrink-0" /> },
   ];

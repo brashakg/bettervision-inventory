@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { requireAuth } from "@/lib/apiAuth";
+import { logActivity } from "@/lib/activityLog";
 
 const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
 const REMOVEBG_API_KEY = process.env.REMOVEBG_API_KEY;
@@ -107,6 +108,17 @@ export async function POST(request: NextRequest) {
         urls.processed = `/uploads/${processedFileName}`;
       }
     }
+
+    // Log activity
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "UPLOAD",
+      entity: "IMAGE",
+      entityId: fileName,
+      details: `Uploaded image: ${file.name} (${(fileBuffer.length / 1024).toFixed(1)}KB)`,
+    });
 
     return NextResponse.json(
       {

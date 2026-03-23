@@ -465,6 +465,28 @@ model StockTransfer {
   @@index([status, createdAt])
 }
 
+// ─────────────────────────────────────────────────────────
+// ACTIVITY LOG — tracks all user actions in the app
+// ─────────────────────────────────────────────────────────
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  userName    String?
+  userEmail   String?
+  action      String   // CREATE, UPDATE, DELETE, SYNC, LOGIN, EXPORT, UPLOAD, etc.
+  entity      String   // PRODUCT, ORDER, CUSTOMER, COLLECTION, USER, SETTINGS, etc.
+  entityId    String?  // ID of the affected entity
+  details     String?  // Human-readable description of what changed
+  metadata    String?  // JSON string with extra data (old/new values, etc.)
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
 model StockTransferItem {
   id              String        @id @default(cuid())
   transferId      String

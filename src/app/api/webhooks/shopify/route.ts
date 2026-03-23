@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { logActivity } from "@/lib/activityLog";
 
 // Shopify sends webhooks as POST requests with HMAC verification
 // The HMAC is in the X-Shopify-Hmac-Sha256 header
@@ -486,6 +487,14 @@ export async function POST(request: NextRequest) {
       await prisma.webhookEvent.update({
         where: { id: event.id },
         data: { status: "PROCESSED", message: `Handled ${topic} for ${shopifyDomain}` },
+      });
+
+      // Log webhook activity
+      logActivity({
+        action: "WEBHOOK",
+        entity: topic.split("/")[0]?.toUpperCase() || "SHOPIFY",
+        entityId: shopifyId,
+        details: `Webhook ${topic} from ${shopifyDomain}`,
       });
     } catch (processError) {
       const errMsg =

@@ -12,6 +12,7 @@ import {
   calculateDiscountedPrice,
 } from "@/lib/autoGenerate";
 import { updateProduct, deleteProduct } from "@/lib/shopify";
+import { logActivity } from "@/lib/activityLog";
 
 export async function GET(
   request: NextRequest,
@@ -132,6 +133,17 @@ export async function PUT(
       });
     }
 
+    // Log activity
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "UPDATE",
+      entity: "PRODUCT",
+      entityId: params.id,
+      details: `Updated product: ${updatedProduct.title || updatedProduct.brand}`,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -186,6 +198,17 @@ export async function DELETE(
         },
       });
     }
+
+    // Log activity
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "DELETE",
+      entity: "PRODUCT",
+      entityId: params.id,
+      details: `Archived product: ${product.title || product.brand} (${product.sku || 'no-sku'})`,
+    });
 
     return NextResponse.json(
       { success: true, message: "Product archived successfully" },

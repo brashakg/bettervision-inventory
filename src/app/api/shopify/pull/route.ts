@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
+import { logActivity } from "@/lib/activityLog";
 import {
   fetchAllProducts,
   fetchProductByShopifyId,
@@ -411,6 +412,16 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    // Log activity
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "PULL",
+      entity: "SHOPIFY",
+      details: `Shopify pull: ${pulledCount} new, ${updatedCount} updated, ${errorCount} errors`,
+    });
 
     return NextResponse.json({
       success: true,
