@@ -19,6 +19,56 @@ function verifyWebhookHmac(body: string, hmacHeader: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
 }
 
+// Parse brand from tags (same logic as pull route)
+function extractBrandFromTags(tags: string, vendor: string): string {
+  const compoundWords: { [key: string]: string } = {
+    tommyhilfiger: "Tommy Hilfiger", rayban: "Ray-Ban", hugoboss: "Hugo Boss",
+    calvinklein: "Calvin Klein", armaniexchange: "Armani Exchange", ralphlauren: "Ralph Lauren",
+    dolcegabbana: "Dolce & Gabbana", michaelkors: "Michael Kors", tomford: "Tom Ford",
+    jimmychoo: "Jimmy Choo", carrerino: "Carrerino", pierrecardin: "Pierre Cardin",
+    katespade: "Kate Spade", bottegaveneta: "Bottega Veneta", stellamccartney: "Stella McCartney",
+    alexandermcqueen: "Alexander McQueen", robertocavalli: "Roberto Cavalli",
+    victoriabeckham: "Victoria Beckham", davidbeckham: "David Beckham",
+    marcjacobs: "Marc Jacobs", sevenstreet: "Seven Street",
+    lenskart: "Lenskart", johnmonroe: "John Monroe",
+  };
+
+  const tagList = tags.split(",").map((t: string) => t.trim().toLowerCase());
+  for (const tag of tagList) {
+    if (tag.startsWith("brand_")) {
+      const brandRaw = tag.replace("brand_", "").trim();
+      if (compoundWords[brandRaw]) return compoundWords[brandRaw];
+      // Title case
+      return brandRaw.charAt(0).toUpperCase() + brandRaw.slice(1);
+    }
+  }
+  // Fallback: vendor (skip "Better Vision")
+  const vendorLower = (vendor || "").toLowerCase();
+  if (vendorLower.includes("better vision") || vendorLower.includes("bettervision")) {
+    return "Unknown";
+  }
+  return vendor || "Unknown";
+}
+
+// Parse tag fields for product attributes
+function parseWebhookTags(tags: string): Record<string, string | null> {
+  const fields: Record<string, string | null> = {};
+  const tagList = tags.split(",").map((t: string) => t.trim().toLowerCase());
+  for (const tag of tagList) {
+    if (tag.startsWith("shape_")) fields.shape = tag.replace("shape_", "").replace(/_/g, " ");
+    else if (tag.startsWith("framecolor_")) fields.frameColor = tag.replace("framecolor_", "").replace(/_/g, " ");
+    else if (tag.startsWith("framematerial_")) fields.frameMaterial = tag.replace("framematerial_", "").replace(/_/g, " ");
+    else if (tag.startsWith("frametype_")) fields.frameType = tag.replace("frametype_", "").replace(/_/g, " ");
+    else if (tag.startsWith("framesize_")) fields.frameSize = tag.replace("framesize_", "").replace(/_/g, " ");
+    else if (tag.startsWith("gender_")) fields.gender = tag.replace("gender_", "").replace(/_/g, " ");
+    else if (tag.startsWith("collection_")) fields.collection = tag.replace("collection_", "").replace(/_/g, " ");
+    else if (tag.startsWith("style_")) fields.style = tag.replace("style_", "").replace(/_/g, " ");
+    else if (tag.startsWith("templetype_")) fields.templeType = tag.replace("templetype_", "").replace(/_/g, " ");
+    else if (tag.startsWith("lenscolour_")) fields.lensColour = tag.replace("lenscolour_", "").replace(/_/g, " ");
+  }
+  return fields;
+}
+
 // Handle product create/update from Shopify
 async function handleProductCreateUpdate(payload: any) {
   const shopifyGid = `gid://shopify/Product/${payload.id}`;
@@ -44,11 +94,15 @@ async function handleProductCreateUpdate(payload: any) {
     ? parseFloat(payload.variants[0].price || "0")
     : 0;
 
-  const productData = {
+  // Extract brand from tags (not vendor "Better Vision")
+  const brand = extractBrandFromTags(tags, payload.vendor || "");
+  const parsedTags = parseWebhookTags(tags);
+
+  const productData: Record<string, any> = {
     shopifyProductId: shopifyGid,
     title,
     status,
-    brand: payload.vendor || "Unknown",
+    brand,
     category: guessCategory(payload),
     htmlDescription: payload.body_html || null,
     tags,
@@ -56,7 +110,19 @@ async function handleProductCreateUpdate(payload: any) {
     mrp,
     discountedPrice: price,
     compareAtPrice: mrp,
+    productName: title || null,
+    fullModelNo: title || null,
   };
+
+  // Add parsed tag fields if present
+  if (parsedTags.shape) productData.shape = parsedTags.shape;
+  if (parsedTags.frameColor) productData.frameColor = parsedTags.frameColor;
+  if (parsedTags.frameMaterial) productData.frameMaterial = parsedTags.frameMaterial;
+  if (parsedTags.frameType) productData.frameType = parsedTags.frameType;
+  if (parsedTags.frameSize) productData.frameSize = parsedTags.frameSize;
+  if (parsedTags.gender) productData.gender = parsedTags.gender;
+  if (parsedTags.collection) productData.collection = parsedTags.collection;
+  if (parsedTags.style) productData.style = parsedTags.style;
 
   let productId: string;
 
@@ -399,7 +465,85 @@ function guessCategory(payload: any): string {
   return "SPECTACLES";
 }
 
+// Background processing: fire-and-forget webhook processing
+// Returns 200 to Shopify immediately, then processes async
+async function processWebhookInBackground(
+  topic: string,
+  payload: any,
+  shopifyId: string | null,
+  shopifyDomain: string,
+  eventId: string
+) {
+  try {
+    switch (topic) {
+      case "products/create":
+      case "products/update":
+        await handleProductCreateUpdate(payload);
+        break;
+      case "products/delete":
+        await handleProductDelete(payload);
+        break;
+      case "inventory_levels/update":
+        await handleInventoryUpdate(payload);
+        break;
+      case "orders/create":
+      case "orders/updated":
+      case "orders/fulfilled":
+      case "orders/paid":
+        await handleOrderCreateUpdate(payload);
+        break;
+      case "orders/cancelled":
+        await handleOrderCancel(payload);
+        break;
+      case "customers/create":
+      case "customers/update":
+        await handleCustomerCreateUpdate(payload);
+        break;
+      case "customers/delete":
+        await handleCustomerDelete(payload);
+        break;
+      case "collections/create":
+      case "collections/update":
+        await handleCollectionCreateUpdate(payload);
+        break;
+      case "collections/delete":
+        await handleCollectionDelete(payload);
+        break;
+      case "fulfillments/create":
+      case "fulfillments/update":
+        console.log(`Fulfillment event: ${topic} for order ${payload.order_id}`);
+        break;
+      case "app/uninstalled":
+        console.warn("App uninstalled from Shopify store!");
+        break;
+      default:
+        console.log(`Unhandled webhook topic: ${topic}`);
+    }
+
+    await prisma.webhookEvent.update({
+      where: { id: eventId },
+      data: { status: "PROCESSED", message: `Handled ${topic} for ${shopifyDomain}` },
+    });
+
+    logActivity({
+      action: "WEBHOOK",
+      entity: topic.split("/")[0]?.toUpperCase() || "SHOPIFY",
+      entityId: shopifyId,
+      details: `Webhook ${topic} from ${shopifyDomain}`,
+    });
+  } catch (processError) {
+    const errMsg =
+      processError instanceof Error ? processError.message : "Processing failed";
+    await prisma.webhookEvent.update({
+      where: { id: eventId },
+      data: { status: "FAILED", message: errMsg },
+    }).catch(() => {});
+    console.error(`Webhook processing error (${topic}):`, errMsg);
+  }
+}
+
 // POST /api/webhooks/shopify — Receive incoming Shopify webhooks
+// IMPORTANT: Returns 200 immediately, processes webhook in background to avoid Shopify 408 timeouts
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
@@ -407,16 +551,12 @@ export async function POST(request: NextRequest) {
     const topic = request.headers.get("x-shopify-topic") || "unknown";
     const shopifyDomain = request.headers.get("x-shopify-shop-domain") || "";
 
-    // Verify HMAC
+    // Verify HMAC (fast operation — do before returning 200)
     if (hmacHeader && !verifyWebhookHmac(rawBody, hmacHeader)) {
       console.error("Webhook HMAC verification failed");
-      await prisma.webhookEvent.create({
-        data: {
-          topic,
-          status: "FAILED",
-          message: "HMAC verification failed",
-        },
-      });
+      prisma.webhookEvent.create({
+        data: { topic, status: "FAILED", message: "HMAC verification failed" },
+      }).catch(() => {});
       return NextResponse.json(
         { success: false, error: "HMAC verification failed" },
         { status: 401 }
@@ -426,87 +566,31 @@ export async function POST(request: NextRequest) {
     const payload = JSON.parse(rawBody);
     const shopifyId = payload.id ? String(payload.id) : null;
 
-    // Log the event
-    const event = await prisma.webhookEvent.create({
+    // Quick-log the event and return 200 immediately
+    // Use a non-awaited create so we respond fast, but catch errors
+    const eventPromise = prisma.webhookEvent.create({
       data: {
         topic,
         shopifyId,
-        payload: rawBody.substring(0, 5000), // Truncate large payloads
+        payload: rawBody.substring(0, 5000),
         status: "RECEIVED",
       },
     });
 
-    // Process based on topic
-    try {
-      switch (topic) {
-        case "products/create":
-        case "products/update":
-          await handleProductCreateUpdate(payload);
-          break;
-        case "products/delete":
-          await handleProductDelete(payload);
-          break;
-        case "inventory_levels/update":
-          await handleInventoryUpdate(payload);
-          break;
-        case "orders/create":
-        case "orders/updated":
-        case "orders/fulfilled":
-        case "orders/paid":
-          await handleOrderCreateUpdate(payload);
-          break;
-        case "orders/cancelled":
-          await handleOrderCancel(payload);
-          break;
-        case "customers/create":
-        case "customers/update":
-          await handleCustomerCreateUpdate(payload);
-          break;
-        case "customers/delete":
-          await handleCustomerDelete(payload);
-          break;
-        case "collections/create":
-        case "collections/update":
-          await handleCollectionCreateUpdate(payload);
-          break;
-        case "collections/delete":
-          await handleCollectionDelete(payload);
-          break;
-        case "fulfillments/create":
-        case "fulfillments/update":
-          // Fulfillment events are handled via order update
-          console.log(`Fulfillment event: ${topic} for order ${payload.order_id}`);
-          break;
-        case "app/uninstalled":
-          console.warn("App uninstalled from Shopify store!");
-          break;
-        default:
-          console.log(`Unhandled webhook topic: ${topic}`);
-      }
-
-      await prisma.webhookEvent.update({
-        where: { id: event.id },
-        data: { status: "PROCESSED", message: `Handled ${topic} for ${shopifyDomain}` },
+    // Fire-and-forget: process webhook in the background
+    // This prevents Shopify 408 timeout errors (5s limit)
+    eventPromise
+      .then((event) => {
+        // Process in background — no await, no blocking
+        processWebhookInBackground(topic, payload, shopifyId, shopifyDomain, event.id);
+      })
+      .catch((err) => {
+        console.error("Failed to log webhook event:", err);
+        // Still try to process even if logging failed
+        processWebhookInBackground(topic, payload, shopifyId, shopifyDomain, "unknown");
       });
 
-      // Log webhook activity
-      logActivity({
-        action: "WEBHOOK",
-        entity: topic.split("/")[0]?.toUpperCase() || "SHOPIFY",
-        entityId: shopifyId,
-        details: `Webhook ${topic} from ${shopifyDomain}`,
-      });
-    } catch (processError) {
-      const errMsg =
-        processError instanceof Error ? processError.message : "Processing failed";
-      await prisma.webhookEvent.update({
-        where: { id: event.id },
-        data: { status: "FAILED", message: errMsg },
-      });
-      console.error(`Webhook processing error (${topic}):`, errMsg);
-    }
-
-    // Always return 200 to Shopify so it doesn't retry
+    // Return 200 to Shopify immediately — webhook will be processed async
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Webhook handler error:", error);
