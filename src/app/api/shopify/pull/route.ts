@@ -8,6 +8,9 @@ import {
   type ShopifyProductNode,
 } from "@/lib/shopify";
 
+// Allow up to 5 minutes for large product pulls
+export const maxDuration = 300;
+
 // Helper: extract metafield value
 function getMetafield(
   product: ShopifyProductNode,
@@ -62,15 +65,69 @@ function guessCategory(product: ShopifyProductNode): string {
 function toTitleCase(text: string): string {
   if (!text) return "";
 
-  // Special compound word mappings
+  // Special compound word mappings (frame attributes + brand names)
   const compoundWords: { [key: string]: string } = {
+    // Frame attributes
     fullframe: "Full Frame",
     halfrim: "Half Rim",
     rimless: "Rimless",
+    stainlesssteel: "Stainless Steel",
     "1year": "1 Year",
     "2year": "2 Year",
     "3year": "3 Year",
     "5year": "5 Year",
+    nonpolarized: "Non Polarized",
+    "100-uvprotection": "100% UV Protection",
+    // Known eyewear brands
+    tommyhilfiger: "Tommy Hilfiger",
+    rayban: "Ray-Ban",
+    "ray-ban": "Ray-Ban",
+    hugoboss: "Hugo Boss",
+    calvinklein: "Calvin Klein",
+    armaniexchange: "Armani Exchange",
+    ralphlauren: "Ralph Lauren",
+    dolcegabbana: "Dolce & Gabbana",
+    michaelkors: "Michael Kors",
+    tomford: "Tom Ford",
+    jimmychoo: "Jimmy Choo",
+    katespade: "Kate Spade",
+    montblanc: "Mont Blanc",
+    carrera: "Carrera",
+    polaroid: "Polaroid",
+    oakley: "Oakley",
+    vogue: "Vogue",
+    versace: "Versace",
+    prada: "Prada",
+    gucci: "Gucci",
+    boss: "Boss",
+    fendi: "Fendi",
+    burberry: "Burberry",
+    bvlgari: "Bvlgari",
+    emporio: "Emporio Armani",
+    emporioarmani: "Emporio Armani",
+    giorgioarmani: "Giorgio Armani",
+    coach: "Coach",
+    chopard: "Chopard",
+    balmain: "Balmain",
+    bolon: "Bolon",
+    idee: "IDEE",
+    opium: "Opium",
+    johnjacobs: "John Jacobs",
+    lenskart: "Lenskart",
+    sevenstreet: "Seven Street",
+    gio: "Gio",
+    titan: "Titan",
+    fastrack: "Fastrack",
+    stepper: "Stepper",
+    silhouette: "Silhouette",
+    rodenstock: "Rodenstock",
+    marcjacobs: "Marc Jacobs",
+    davidbeckham: "David Beckham",
+    pierrecardin: "Pierre Cardin",
+    harryporter: "Harry Porter",
+    scottsiyabenn: "Scott Siyabenn",
+    marksmith: "Mark Smith",
+    "bettervision": "Better Vision",
   };
 
   // Check for exact matches first
@@ -101,6 +158,10 @@ function parseTagsToFields(tags: string[]): {
   warranty?: string;
   weight?: string;
   gender?: string;
+  lensColour?: string;
+  tint?: string;
+  polarization?: string;
+  uvProtection?: string;
 } {
   const parsed: any = {};
 
@@ -138,8 +199,16 @@ function parseTagsToFields(tags: string[]): {
       parsed.gender = toTitleCase(value);
     } else if (lowerPrefix === "brand") {
       parsed.brand = toTitleCase(value);
+    } else if (lowerPrefix === "lenscolour") {
+      parsed.lensColour = toTitleCase(value);
+    } else if (lowerPrefix === "tint") {
+      parsed.tint = toTitleCase(value);
+    } else if (lowerPrefix === "polarization") {
+      parsed.polarization = toTitleCase(value);
+    } else if (lowerPrefix === "uvprotection") {
+      parsed.uvProtection = toTitleCase(value);
     }
-    // Ignore: other_xxx
+    // Ignore: product_xxx, productusp_, lensusp_, lensmaterial_, origin_, other_xxx
   }
 
   return parsed;
@@ -251,6 +320,18 @@ async function upsertProduct(sp: ShopifyProductNode) {
   }
   if (parsedTags.weight) {
     productData.weight = parsedTags.weight;
+  }
+  if (parsedTags.lensColour) {
+    productData.lensColour = parsedTags.lensColour;
+  }
+  if (parsedTags.tint) {
+    productData.tint = parsedTags.tint;
+  }
+  if (parsedTags.polarization) {
+    productData.polarization = parsedTags.polarization;
+  }
+  if (parsedTags.uvProtection) {
+    productData.uvProtection = parsedTags.uvProtection;
   }
 
   let productId: string;
