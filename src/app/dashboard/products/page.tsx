@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  ChevronDown,
 } from 'lucide-react';
 import SearchableDropdown from '@/components/SearchableDropdown';
 
@@ -34,10 +35,14 @@ interface Location {
   code: string;
 }
 
-interface Attribute {
-  id: string;
-  name: string;
-  options: Array<{ id: string; value: string }>;
+interface FiltersResponse {
+  success: boolean;
+  brands: string[];
+  shapes: string[];
+  frameMaterials: string[];
+  genders: string[];
+  categories: string[];
+  statuses: string[];
 }
 
 const CATEGORIES = ['All', 'Spectacles', 'Sunglasses', 'Solutions'];
@@ -56,8 +61,15 @@ export default function ProductsPage() {
   const [status, setStatus] = useState('All');
   const [location, setLocation] = useState('');
   const [search, setSearch] = useState('');
+  const [shape, setShape] = useState('');
+  const [frameMaterial, setFrameMaterial] = useState('');
+  const [gender, setGender] = useState('');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   const [brands, setBrands] = useState<string[]>([]);
+  const [shapes, setShapes] = useState<string[]>([]);
+  const [frameMaterials, setFrameMaterials] = useState<string[]>([]);
+  const [genders, setGenders] = useState<string[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
     new Set()
@@ -70,7 +82,8 @@ export default function ProductsPage() {
       try {
         const res = await fetch('/api/locations');
         const data = await res.json();
-        setLocations(data || []);
+        // Handle both array and { data: [...] } response formats
+        setLocations(Array.isArray(data) ? data : (data?.data || []));
       } catch (error) {
         console.error('Error fetching locations:', error);
       }
@@ -78,21 +91,23 @@ export default function ProductsPage() {
     fetchLocations();
   }, []);
 
-  // Fetch brands
+  // Fetch filter options from new /api/products/filters endpoint
   useEffect(() => {
-    const fetchBrands = async () => {
+    const fetchFilters = async () => {
       try {
-        const res = await fetch('/api/attributes');
-        const data: Attribute[] = await res.json();
-        const brandAttr = data.find((attr) => attr.name.toLowerCase() === 'brand');
-        if (brandAttr) {
-          setBrands(brandAttr.options.map((opt) => opt.value));
+        const res = await fetch('/api/products/filters');
+        const data: FiltersResponse = await res.json();
+        if (data.success) {
+          setBrands(data.brands || []);
+          setShapes(data.shapes || []);
+          setFrameMaterials(data.frameMaterials || []);
+          setGenders(data.genders || []);
         }
       } catch (error) {
-        console.error('Error fetching brands:', error);
+        console.error('Error fetching filters:', error);
       }
     };
-    fetchBrands();
+    fetchFilters();
   }, []);
 
   // Fetch products
@@ -108,6 +123,9 @@ export default function ProductsPage() {
           ...(status !== 'All' && { status: status.toUpperCase() }),
           ...(location && { location }),
           ...(search && { search }),
+          ...(shape && { shape }),
+          ...(frameMaterial && { frameMaterial }),
+          ...(gender && { gender }),
         });
 
         const res = await fetch(`/api/products?${params}`);
@@ -122,7 +140,7 @@ export default function ProductsPage() {
     };
 
     fetchProducts();
-  }, [page, limit, category, brand, status, location, search]);
+  }, [page, limit, category, brand, status, location, search, shape, frameMaterial, gender]);
 
   const handleSelectProduct = (id: string) => {
     const newSelected = new Set(selectedProducts);
@@ -223,6 +241,8 @@ export default function ProductsPage() {
 
   const pages = Math.ceil(total / limit);
 
+  const hasActiveMoreFilters = shape || frameMaterial || gender;
+
   return (
     <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -284,6 +304,49 @@ export default function ProductsPage() {
                 className="w-full px-3 py-3 min-h-[44px] border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               />
             </div>
+          </div>
+
+          {/* More Filters Collapsible Section */}
+          <div className="mt-4 border-t pt-4">
+            <button
+              onClick={() => setShowMoreFilters(!showMoreFilters)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${
+                  showMoreFilters ? 'rotate-180' : ''
+                }`}
+              />
+              More Filters
+              {hasActiveMoreFilters && (
+                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
+                  {[shape, frameMaterial, gender].filter(Boolean).length} active
+                </span>
+              )}
+            </button>
+
+            {showMoreFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-4">
+                <SearchableDropdown
+                  label="Shape"
+                  options={shapes}
+                  value={shape}
+                  onChange={setShape}
+                />
+                <SearchableDropdown
+                  label="Frame Material"
+                  options={frameMaterials}
+                  value={frameMaterial}
+                  onChange={setFrameMaterial}
+                />
+                <SearchableDropdown
+                  label="Gender"
+                  options={genders}
+                  value={gender}
+                  onChange={setGender}
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -56,6 +56,91 @@ function guessCategory(product: ShopifyProductNode): string {
   return "SPECTACLES";
 }
 
+// Helper: convert hyphenated/lowercase text to title case
+// Handles compound words like "fullframe" -> "Full Frame", "orochiaro" -> "Orochiaro"
+function toTitleCase(text: string): string {
+  if (!text) return "";
+
+  // Special compound word mappings
+  const compoundWords: { [key: string]: string } = {
+    fullframe: "Full Frame",
+    halfrim: "Half Rim",
+    rimless: "Rimless",
+    "1year": "1 Year",
+    "2year": "2 Year",
+    "3year": "3 Year",
+    "5year": "5 Year",
+  };
+
+  // Check for exact matches first
+  if (compoundWords[text.toLowerCase()]) {
+    return compoundWords[text.toLowerCase()];
+  }
+
+  // For normal words, capitalize first letter of each word
+  return text
+    .split(/[\s_-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+// Helper: parse Shopify tags into structured fields
+// Tags format: "brand_burberry", "shape_square", "framecolor_orochiaro", etc.
+function parseTagsToFields(tags: string[]): {
+  shape?: string;
+  frameColor?: string;
+  templeColor?: string;
+  frameMaterial?: string;
+  templeMaterial?: string;
+  frameType?: string;
+  frameSize?: string;
+  bridge?: string;
+  templeLength?: string;
+  warranty?: string;
+  weight?: string;
+  gender?: string;
+} {
+  const parsed: any = {};
+
+  for (const tag of tags) {
+    const [prefix, ...valueParts] = tag.split("_");
+    if (!prefix || valueParts.length === 0) continue;
+
+    const value = valueParts.join("_"); // Handle cases where value contains underscore
+    const lowerPrefix = prefix.toLowerCase();
+
+    // Parse known tag prefixes
+    if (lowerPrefix === "shape") {
+      parsed.shape = toTitleCase(value);
+    } else if (lowerPrefix === "framecolor") {
+      parsed.frameColor = toTitleCase(value);
+    } else if (lowerPrefix === "templecolor") {
+      parsed.templeColor = toTitleCase(value);
+    } else if (lowerPrefix === "framematerial") {
+      parsed.frameMaterial = toTitleCase(value);
+    } else if (lowerPrefix === "templematerial") {
+      parsed.templeMaterial = toTitleCase(value);
+    } else if (lowerPrefix === "frametype") {
+      parsed.frameType = toTitleCase(value);
+    } else if (lowerPrefix === "framesize") {
+      parsed.frameSize = value; // Keep as-is (numeric)
+    } else if (lowerPrefix === "bridge") {
+      parsed.bridge = value; // Keep as-is (numeric)
+    } else if (lowerPrefix === "templelength") {
+      parsed.templeLength = value; // Keep as-is (numeric)
+    } else if (lowerPrefix === "warranty") {
+      parsed.warranty = toTitleCase(value);
+    } else if (lowerPrefix === "weight") {
+      parsed.weight = value; // Keep as-is (with unit like "27g")
+    } else if (lowerPrefix === "gender") {
+      parsed.gender = toTitleCase(value);
+    }
+    // Ignore: brand_xxx (we use vendor), other_xxx
+  }
+
+  return parsed;
+}
+
 // Helper: upsert a single Shopify product into local DB
 async function upsertProduct(sp: ShopifyProductNode) {
   const existing = await prisma.product.findFirst({
@@ -74,7 +159,11 @@ async function upsertProduct(sp: ShopifyProductNode) {
     : 0;
   const basePrice = firstVariant ? parseFloat(firstVariant.price || "0") : 0;
 
-  const productData = {
+  // Parse tags to extract structured fields
+  const parsedTags = parseTagsToFields(sp.tags);
+
+  // Build productData, only adding parsed tag values if the field is null/empty
+  const productData: any = {
     shopifyProductId: sp.id,
     title: sp.title,
     category,
@@ -95,6 +184,46 @@ async function upsertProduct(sp: ShopifyProductNode) {
     countryOfOrigin: getMetafield(sp, "custom", "country_of_origin") || null,
     warranty: getMetafield(sp, "custom", "warranty") || null,
   };
+
+  // Add parsed tag values only if field is currently null/empty
+  if (!productData.shape && parsedTags.shape) {
+    productData.shape = parsedTags.shape;
+  }
+  if (!productData.frameMaterial && parsedTags.frameMaterial) {
+    productData.frameMaterial = parsedTags.frameMaterial;
+  }
+  if (!productData.gender && parsedTags.gender) {
+    productData.gender = parsedTags.gender;
+  }
+  if (!productData.warranty && parsedTags.warranty) {
+    productData.warranty = parsedTags.warranty;
+  }
+
+  // Add additional parsed fields (these don't have metafield equivalents)
+  if (parsedTags.frameColor) {
+    productData.frameColor = parsedTags.frameColor;
+  }
+  if (parsedTags.templeColor) {
+    productData.templeColor = parsedTags.templeColor;
+  }
+  if (parsedTags.templeMaterial) {
+    productData.templeMaterial = parsedTags.templeMaterial;
+  }
+  if (parsedTags.frameType) {
+    productData.frameType = parsedTags.frameType;
+  }
+  if (parsedTags.frameSize) {
+    productData.frameSize = parsedTags.frameSize;
+  }
+  if (parsedTags.bridge) {
+    productData.bridge = parsedTags.bridge;
+  }
+  if (parsedTags.templeLength) {
+    productData.templeLength = parsedTags.templeLength;
+  }
+  if (parsedTags.weight) {
+    productData.weight = parsedTags.weight;
+  }
 
   let productId: string;
 

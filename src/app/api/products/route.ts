@@ -41,13 +41,19 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const location = searchParams.get("location");
     const search = searchParams.get("search");
+    const shape = searchParams.get("shape");
+    const frameMaterial = searchParams.get("frameMaterial");
+    const gender = searchParams.get("gender");
 
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (brand) where.brand = brand;
+    if (brand) where.brand = { equals: brand, mode: "insensitive" };
     if (status) where.status = status;
+    if (shape) where.shape = { equals: shape, mode: "insensitive" };
+    if (frameMaterial) where.frameMaterial = { equals: frameMaterial, mode: "insensitive" };
+    if (gender) where.gender = { equals: gender, mode: "insensitive" };
     if (search) {
       where.OR = [
         { title: { contains: search, mode: "insensitive" } },
