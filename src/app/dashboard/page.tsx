@@ -33,27 +33,26 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("/api/products?limit=100");
-        const json = await res.json();
+        // Fetch stats and recent products in parallel
+        const [statsRes, productsRes] = await Promise.all([
+          fetch("/api/products/stats"),
+          fetch("/api/products?limit=10"),
+        ]);
+        const statsJson = await statsRes.json();
+        const productsJson = await productsRes.json();
 
-        // API returns { success, data: [...], pagination }
-        const products = json.data || [];
+        if (statsJson.success) {
+          setStats({
+            total: statsJson.data.total,
+            published: statsJson.data.published,
+            draft: statsJson.data.draft,
+            lowStock: statsJson.data.lowStock,
+          });
+        }
 
-        const total = json.pagination?.total || products.length;
-        const published = products.filter(
-          (p: any) => p.status === "PUBLISHED"
-        ).length;
-        const draft = products.filter((p: any) => p.status === "DRAFT").length;
-        const lowStock = products.filter((p: any) => {
-          const stock = p.locations
-            ? p.locations.reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0)
-            : 0;
-          return stock < 10;
-        }).length;
-
-        setStats({ total, published, draft, lowStock });
+        const productsList = productsJson.data || [];
         setProducts(
-          products.slice(0, 10).map((p: any) => ({
+          productsList.slice(0, 10).map((p: any) => ({
             id: p.id,
             name: p.title || p.productName || "Untitled",
             status: p.status,
@@ -64,7 +63,7 @@ export default function DashboardPage() {
           }))
         );
       } catch (error) {
-        console.error("Failed to fetch products:", error);
+        console.error("Failed to fetch dashboard data:", error);
       } finally {
         setLoading(false);
       }
@@ -117,9 +116,12 @@ export default function DashboardPage() {
         >
           + Add Product
         </Link>
-        <button className="bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 sm:px-6 py-3 min-h-[44px] rounded-lg font-medium transition-colors">
+        <Link
+          href="/dashboard/shopify"
+          className="bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 sm:px-6 py-3 min-h-[44px] rounded-lg font-medium transition-colors text-center sm:text-left"
+        >
           Sync to Shopify
-        </button>
+        </Link>
       </div>
 
       {/* Recent Products Table - responsive with scroll on mobile */}

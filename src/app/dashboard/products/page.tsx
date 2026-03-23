@@ -22,6 +22,7 @@ interface Product {
   category: string;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   mrp: number;
+  shopifyProductId: string | null;
   images: Array<{ url: string }>;
   locations: Array<{ quantity: number }>;
   syncLogs: Array<{ status: string; createdAt: string }>;
@@ -213,6 +214,8 @@ export default function ProductsPage() {
   };
 
   const getLastSyncStatus = (product: Product) => {
+    // If product has a Shopify ID, it's synced (either pushed or pulled)
+    if (product.shopifyProductId) return '✓ Synced';
     const lastSync = product.syncLogs[0];
     if (!lastSync) return 'Not synced';
     return lastSync.status === 'SUCCESS' ? '✓ Synced' : '✗ Failed';
