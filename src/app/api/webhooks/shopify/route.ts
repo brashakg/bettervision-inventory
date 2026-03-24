@@ -134,11 +134,9 @@ async function handleProductCreateUpdate(payload: any) {
     });
     productId = existing.id;
   } else {
+    productData.sku = payload.variants?.[0]?.sku || `SHOP-${payload.handle || payload.id}`;
     const created = await prisma.product.create({
-      data: {
-        ...productData,
-        sku: payload.variants?.[0]?.sku || `SHOP-${payload.handle || payload.id}`,
-      },
+      data: productData as any,
     });
     productId = created.id;
   }
