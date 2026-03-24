@@ -38,8 +38,14 @@ export default function CustomersPage() {
       try {
         const res = await fetch('/api/customers/stats');
         if (!res.ok) throw new Error('Failed to fetch stats');
-        const data = await res.json();
-        setStats(data);
+        const json = await res.json();
+        const d = json.data || json;
+        setStats({
+          totalCustomers: d.totalCustomers || 0,
+          customersWithOrders: d.withOrders ?? d.customersWithOrders ?? 0,
+          acceptsMarketing: d.acceptsMarketing || 0,
+          avgOrderValue: d.avgOrderValue || 0,
+        });
       } catch (err) {
         console.error('Error fetching stats:', err);
         setError('Failed to load stats');
@@ -62,8 +68,8 @@ export default function CustomersPage() {
         const res = await fetch(`/api/customers?${params}`);
         if (!res.ok) throw new Error('Failed to fetch customers');
         const data = await res.json();
-        setCustomers(data.customers || []);
-        setTotalPages(Math.ceil(data.total / ITEMS_PER_PAGE));
+        setCustomers(data.data || data.customers || []);
+        setTotalPages(Math.ceil((data.pagination?.total || data.total || 0) / ITEMS_PER_PAGE));
       } catch (err) {
         console.error('Error fetching customers:', err);
         setError('Failed to load customers');
@@ -100,7 +106,7 @@ export default function CustomersPage() {
             </div>
             <div className="bg-white rounded-lg shadow p-6">
               <p className="text-gray-600 text-sm font-medium">Avg Order Value</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">₹{stats.avgOrderValue.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">₹{(stats.avgOrderValue || 0).toFixed(2)}</p>
             </div>
           </div>
         )}
@@ -169,7 +175,7 @@ export default function CustomersPage() {
                         <td className="px-6 py-4 text-sm text-gray-600">{customer.phone || '—'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{customer.city || '—'}</td>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer.ordersCount}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{customer.totalSpent.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{(customer.totalSpent || 0).toFixed(2)}</td>
                         <td className="px-6 py-4">
                           {customer.acceptsMarketing ? (
                             <Check className="w-5 h-5 text-green-600" />

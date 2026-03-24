@@ -127,6 +127,7 @@ function toTitleCase(text: string): string {
     harryporter: "Harry Porter",
     scottsiyabenn: "Scott Siyabenn",
     marksmith: "Mark Smith",
+    davidjones: "David Jones",
     "bettervision": "Better Vision",
   };
 

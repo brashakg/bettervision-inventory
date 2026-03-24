@@ -31,6 +31,7 @@ function extractBrandFromTags(tags: string, vendor: string): string {
     victoriabeckham: "Victoria Beckham", davidbeckham: "David Beckham",
     marcjacobs: "Marc Jacobs", sevenstreet: "Seven Street",
     lenskart: "Lenskart", johnmonroe: "John Monroe",
+    davidjones: "David Jones",
   };
 
   const tagList = tags.split(",").map((t: string) => t.trim().toLowerCase());

@@ -14,6 +14,32 @@ interface AttributeType {
   options: AttributeOption[];
 }
 
+// Format camelCase/concatenated attribute names to Title Case
+function formatAttributeName(name: string): string {
+  // Insert space before uppercase letters (camelCase)
+  const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  // Insert space before known word boundaries in concatenated names
+  const expanded = spaced
+    .replace(/countryof/i, 'Country of ')
+    .replace(/framecolor/i, 'Frame Color')
+    .replace(/framematerial/i, 'Frame Material')
+    .replace(/frametype/i, 'Frame Type')
+    .replace(/framesize/i, 'Frame Size')
+    .replace(/lenscolour/i, 'Lens Colour')
+    .replace(/lensmaterial/i, 'Lens Material')
+    .replace(/lensUSP/i, 'Lens USP')
+    .replace(/^polarization$/i, 'Polarization')
+    .replace(/^gender$/i, 'Gender')
+    .replace(/^brand$/i, 'Brand');
+  // Title case each word
+  return expanded
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+    .replace(/ Of /g, ' of ')
+    .replace(/Usp/g, 'USP');
+}
+
 export default function AttributesPage() {
   const [attributeTypes, setAttributeTypes] = useState<AttributeType[]>([]);
   const [selectedType, setSelectedType] = useState<AttributeType | null>(null);
@@ -157,7 +183,7 @@ export default function AttributesPage() {
                         : ""
                     }`}
                   >
-                    <div className="font-medium text-slate-900">{type.name}</div>
+                    <div className="font-medium text-slate-900">{formatAttributeName(type.name)}</div>
                     <div className="text-sm text-slate-500">{type.options.length} options</div>
                   </button>
                 ))}
@@ -171,7 +197,7 @@ export default function AttributesPage() {
               <div className="bg-white rounded-lg shadow">
                 <div className="p-6 border-b border-slate-200">
                   <h2 className="text-xl font-semibold text-slate-900 mb-4">
-                    {selectedType.name} Options
+                    {formatAttributeName(selectedType.name)} Options
                   </h2>
 
                   {/* Add New Option */}

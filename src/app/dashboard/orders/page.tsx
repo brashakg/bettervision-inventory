@@ -53,7 +53,7 @@ export default function OrdersPage() {
         const res = await fetch('/api/orders/stats');
         if (!res.ok) throw new Error('Failed to fetch stats');
         const data = await res.json();
-        setStats(data);
+        setStats(data.data || data);
       } catch (err) {
         console.error('Error fetching stats:', err);
         setError('Failed to load stats');
@@ -77,8 +77,8 @@ export default function OrdersPage() {
         const res = await fetch(`/api/orders?${params}`);
         if (!res.ok) throw new Error('Failed to fetch orders');
         const data = await res.json();
-        setOrders(data.orders || []);
-        setTotalPages(Math.ceil(data.total / ITEMS_PER_PAGE));
+        setOrders(data.data || data.orders || []);
+        setTotalPages(Math.ceil((data.pagination?.total || data.total || 0) / ITEMS_PER_PAGE));
       } catch (err) {
         console.error('Error fetching orders:', err);
         setError('Failed to load orders');
@@ -102,8 +102,8 @@ export default function OrdersPage() {
       // Refresh stats and orders
       const statsRes = await fetch('/api/orders/stats');
       const statsData = await statsRes.json();
-      setStats(statsData);
-      
+      setStats(statsData.data || statsData);
+
       // Refresh current page
       const params = new URLSearchParams({
         page: page.toString(),
@@ -113,7 +113,7 @@ export default function OrdersPage() {
       });
       const ordersRes = await fetch(`/api/orders?${params}`);
       const ordersData = await ordersRes.json();
-      setOrders(ordersData.orders || []);
+      setOrders(ordersData.data || ordersData.orders || []);
     } catch (err) {
       console.error('Error syncing orders:', err);
       setError('Failed to sync orders');
@@ -173,7 +173,7 @@ export default function OrdersPage() {
             </div>
             <div className="bg-white rounded-lg shadow p-6">
               <p className="text-gray-600 text-sm font-medium">Total Revenue</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">₹{stats.totalRevenue.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">₹{(stats.totalRevenue || 0).toLocaleString('en-IN')}</p>
             </div>
           </div>
         )}
@@ -264,8 +264,8 @@ export default function OrdersPage() {
                         <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleOrderExpand(order.id)}>
                           <td className="px-6 py-4 text-sm font-medium text-blue-600">#{order.orderNumber}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{order.customerName}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{order.lineItems.length} items</td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{order.totalPrice.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{(order.lineItems || []).length} items</td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{(order.totalPrice || 0).toFixed(2)}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getFinancialStatusBadge(order.financialStatus)}`}>
                               {order.financialStatus}
@@ -276,7 +276,7 @@ export default function OrdersPage() {
                               {order.fulfillmentStatus}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—'}</td>
                           <td className="px-6 py-4">
                             {expandedOrders[order.id] ? (
                               <ChevronUp className="w-4 h-4 text-gray-400" />
@@ -294,7 +294,7 @@ export default function OrdersPage() {
                                   {order.lineItems.map((item) => (
                                     <div key={item.id} className="flex justify-between items-center text-sm">
                                       <span className="text-gray-700">{item.title}</span>
-                                      <span className="text-gray-600">Qty: {item.quantity} × ₹{item.price.toFixed(2)}</span>
+                                      <span className="text-gray-600">Qty: {item.quantity} × ₹{(item.price || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
