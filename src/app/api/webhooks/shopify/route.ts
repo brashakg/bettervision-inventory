@@ -194,6 +194,74 @@ async function handleProductCreateUpdate(payload: any) {
     }
   }
 
+  // ── Sync inventory from webhook payload ──
+  // Webhook variants have inventory_quantity (REST API format)
+  if (payload.variants) {
+    let defaultLocation = await prisma.location.findFirst({
+      where: { code: "SHOPIFY" },
+    });
+    if (!defaultLocation) {
+      defaultLocation = await prisma.location.create({
+        data: {
+          name: "Shopify Online Store",
+          code: "SHOPIFY",
+          address: "Online",
+          isActive: true,
+        },
+      });
+    }
+
+    // Sum up total inventory from all variants
+    const totalInventory = payload.variants.reduce(
+      (sum: number, v: any) => sum + (v.inventory_quantity || 0),
+      0
+    );
+
+    // Upsert product-level inventory
+    await prisma.productLocation.upsert({
+      where: {
+        productId_locationId: {
+          productId,
+          locationId: defaultLocation.id,
+        },
+      },
+      update: { quantity: totalInventory },
+      create: {
+        productId,
+        locationId: defaultLocation.id,
+        quantity: totalInventory,
+      },
+    });
+
+    // Upsert variant-level inventory
+    const updatedVariants = await prisma.productVariant.findMany({
+      where: { productId },
+    });
+
+    for (const sv of payload.variants) {
+      const svGid = `gid://shopify/ProductVariant/${sv.id}`;
+      const localVariant = updatedVariants.find(
+        (v) => v.shopifyVariantId === svGid
+      );
+      if (localVariant && sv.inventory_quantity != null) {
+        await prisma.variantLocation.upsert({
+          where: {
+            variantId_locationId: {
+              variantId: localVariant.id,
+              locationId: defaultLocation.id,
+            },
+          },
+          update: { quantity: sv.inventory_quantity || 0 },
+          create: {
+            variantId: localVariant.id,
+            locationId: defaultLocation.id,
+            quantity: sv.inventory_quantity || 0,
+          },
+        });
+      }
+    }
+  }
+
   return productId;
 }
 

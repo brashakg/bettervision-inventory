@@ -455,6 +455,66 @@ async function upsertProduct(sp: ShopifyProductNode) {
     }
   }
 
+  // ── Sync inventory quantities ──
+  // Get or create a default "Shopify" location for inventory tracking
+  let defaultLocation = await prisma.location.findFirst({
+    where: { code: "SHOPIFY" },
+  });
+  if (!defaultLocation) {
+    defaultLocation = await prisma.location.create({
+      data: {
+        name: "Shopify Online Store",
+        code: "SHOPIFY",
+        address: "Online",
+        isActive: true,
+      },
+    });
+  }
+
+  // Upsert product-level inventory (totalInventory)
+  await prisma.productLocation.upsert({
+    where: {
+      productId_locationId: {
+        productId,
+        locationId: defaultLocation.id,
+      },
+    },
+    update: { quantity: sp.totalInventory || 0 },
+    create: {
+      productId,
+      locationId: defaultLocation.id,
+      quantity: sp.totalInventory || 0,
+    },
+  });
+
+  // Upsert variant-level inventory (inventoryQuantity)
+  const updatedVariants = await prisma.productVariant.findMany({
+    where: { productId },
+  });
+
+  for (const ve of sp.variants.edges) {
+    const sv = ve.node;
+    const localVariant = updatedVariants.find(
+      (v) => v.shopifyVariantId === sv.id
+    );
+    if (localVariant) {
+      await prisma.variantLocation.upsert({
+        where: {
+          variantId_locationId: {
+            variantId: localVariant.id,
+            locationId: defaultLocation.id,
+          },
+        },
+        update: { quantity: sv.inventoryQuantity || 0 },
+        create: {
+          variantId: localVariant.id,
+          locationId: defaultLocation.id,
+          quantity: sv.inventoryQuantity || 0,
+        },
+      });
+    }
+  }
+
   return productId;
 }
 
