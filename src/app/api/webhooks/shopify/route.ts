@@ -99,7 +99,9 @@ async function handleProductCreateUpdate(payload: any) {
   const brand = extractBrandFromTags(tags, payload.vendor || "");
   const parsedTags = parseWebhookTags(tags);
 
-  const productData: Record<string, any> = {
+  // Base update data — does NOT include productName/fullModelNo to avoid
+  // overwriting values that were properly parsed during the initial pull
+  const updateData: Record<string, any> = {
     shopifyProductId: shopifyGid,
     title,
     status,
@@ -111,32 +113,39 @@ async function handleProductCreateUpdate(payload: any) {
     mrp,
     discountedPrice: price,
     compareAtPrice: mrp,
-    productName: title || null,
-    fullModelNo: title || null,
   };
 
   // Add parsed tag fields if present
-  if (parsedTags.shape) productData.shape = parsedTags.shape;
-  if (parsedTags.frameColor) productData.frameColor = parsedTags.frameColor;
-  if (parsedTags.frameMaterial) productData.frameMaterial = parsedTags.frameMaterial;
-  if (parsedTags.frameType) productData.frameType = parsedTags.frameType;
-  if (parsedTags.frameSize) productData.frameSize = parsedTags.frameSize;
-  if (parsedTags.gender) productData.gender = parsedTags.gender;
-  if (parsedTags.collection) productData.collection = parsedTags.collection;
-  if (parsedTags.style) productData.style = parsedTags.style;
+  if (parsedTags.shape) updateData.shape = parsedTags.shape;
+  if (parsedTags.frameColor) updateData.frameColor = parsedTags.frameColor;
+  if (parsedTags.frameMaterial) updateData.frameMaterial = parsedTags.frameMaterial;
+  if (parsedTags.frameType) updateData.frameType = parsedTags.frameType;
+  if (parsedTags.frameSize) updateData.frameSize = parsedTags.frameSize;
+  if (parsedTags.gender) updateData.gender = parsedTags.gender;
+  if (parsedTags.collection) updateData.collection = parsedTags.collection;
+  if (parsedTags.style) updateData.style = parsedTags.style;
 
   let productId: string;
 
   if (existing) {
+    // For existing products: update only Shopify-driven fields.
+    // Do NOT overwrite productName/fullModelNo/modelNo/subBrand/label/colorCode
+    // — those are set properly during the full pull and may have been customised.
     await prisma.product.update({
       where: { id: existing.id },
-      data: productData,
+      data: updateData,
     });
     productId = existing.id;
   } else {
-    productData.sku = payload.variants?.[0]?.sku || `SHOP-${payload.handle || payload.id}`;
+    // For new products: also set the display name fields from the title as defaults
+    const createData = {
+      ...updateData,
+      sku: payload.variants?.[0]?.sku || `SHOP-${payload.handle || payload.id}`,
+      productName: title || null,
+      fullModelNo: title || null,
+    };
     const created = await prisma.product.create({
-      data: productData as any,
+      data: createData as any,
     });
     productId = created.id;
   }
