@@ -59,6 +59,8 @@ export default function StockTallyPage() {
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [result, setResult] = useState<TallyResult | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileMsg, setReconcileMsg] = useState<string | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -163,6 +165,41 @@ export default function StockTallyPage() {
     a.download = `stock-tally-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleReconcile = async () => {
+    if (!result || !selectedLocation) return;
+    // Only reconcile items with differences
+    const adjustments = result.comparisonData
+      .filter((i) => i.difference !== 0)
+      .map((i) => ({ variantId: i.variantId, newQuantity: i.physicalQty }));
+
+    if (adjustments.length === 0) {
+      setReconcileMsg("No differences to reconcile.");
+      return;
+    }
+
+    if (!confirm(`Update ${adjustments.length} variant(s) to match physical counts?`)) return;
+
+    setReconciling(true);
+    setReconcileMsg(null);
+    try {
+      const res = await fetch("/api/stock-tally/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locationId: selectedLocation, adjustments }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReconcileMsg(`Reconciled: ${data.summary.localUpdated} variant(s) updated.`);
+      } else {
+        setReconcileMsg(`Error: ${data.error}`);
+      }
+    } catch {
+      setReconcileMsg("Reconcile request failed.");
+    } finally {
+      setReconciling(false);
+    }
   };
 
   const statusColor = (s: string) =>
@@ -317,13 +354,30 @@ export default function StockTallyPage() {
               </div>
             )}
 
+            {reconcileMsg && (
+              <div className={`p-3 rounded-lg text-sm mb-4 ${reconcileMsg.startsWith("Error") ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-700 border border-green-200"}`}>
+                {reconcileMsg}
+              </div>
+            )}
+
             {/* Comparison table */}
             <div className="bg-white rounded-xl shadow-sm border p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-slate-700">Product Comparison</h2>
-                <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
-                  <Download size={14} /> Export CSV
-                </button>
+                <div className="flex gap-2">
+                  {result.comparisonData.some((i) => i.difference !== 0) && (
+                    <button
+                      onClick={handleReconcile}
+                      disabled={reconciling}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {reconciling ? "Reconciling..." : "Reconcile Differences"}
+                    </button>
+                  )}
+                  <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                    <Download size={14} /> Export CSV
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

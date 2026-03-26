@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ScrollText,
   Upload,
+  Percent,
 } from "lucide-react";
 
 interface NavItem {
@@ -66,6 +67,7 @@ export default function Sidebar() {
     { href: "/dashboard/activity-logs", label: "Activity Logs", icon: <ScrollText className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/images", label: "Images", icon: <Image className="w-5 h-5 flex-shrink-0" /> },
     { href: "/dashboard/shopify", label: "Shopify Sync", icon: <Settings className="w-5 h-5 flex-shrink-0" /> },
+    { href: "/dashboard/admin/discount-rules", label: "Discount Rules", icon: <Percent className="w-5 h-5 flex-shrink-0" /> },
   ];
 
   const isActive = (href: string, exact?: boolean) => {

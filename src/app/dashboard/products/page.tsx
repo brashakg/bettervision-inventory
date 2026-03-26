@@ -227,6 +227,49 @@ export default function ProductsPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedProducts.size === 0) return;
+    if (!confirm(`Permanently delete ${selectedProducts.size} product(s)? This cannot be undone.`)) return;
+
+    try {
+      const results = await Promise.allSettled(
+        Array.from(selectedProducts).map((productId) =>
+          fetch(`/api/products/${productId}`, { method: 'DELETE' })
+        )
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) alert(`${failed} product(s) failed to delete.`);
+      setSelectedProducts(new Set());
+      setPage(1);
+    } catch (error) {
+      console.error('Error deleting products:', error);
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus: string) => {
+    if (selectedProducts.size === 0) return;
+    const label = newStatus === 'PUBLISHED' ? 'publish' : newStatus === 'DRAFT' ? 'set to draft' : newStatus.toLowerCase();
+    if (!confirm(`${label} ${selectedProducts.size} product(s)?`)) return;
+
+    try {
+      const results = await Promise.allSettled(
+        Array.from(selectedProducts).map((productId) =>
+          fetch(`/api/products/${productId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) alert(`${failed} product(s) failed to update.`);
+      setSelectedProducts(new Set());
+      setPage(1);
+    } catch (error) {
+      console.error('Error updating products:', error);
+    }
+  };
+
   const getTotalStock = (product: Product) => {
     return product.locations.reduce((sum, loc) => sum + loc.quantity, 0);
   };
@@ -370,10 +413,28 @@ export default function ProductsPage() {
                 Sync to Shopify
               </button>
               <button
+                onClick={() => handleBulkStatusChange('PUBLISHED')}
+                className="bg-blue-600 text-white px-4 py-3 min-h-[44px] rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Publish
+              </button>
+              <button
+                onClick={() => handleBulkStatusChange('DRAFT')}
+                className="bg-yellow-600 text-white px-4 py-3 min-h-[44px] rounded-lg hover:bg-yellow-700 transition-colors text-sm"
+              >
+                Draft
+              </button>
+              <button
                 onClick={handleArchiveSelected}
                 className="bg-gray-600 text-white px-4 py-3 min-h-[44px] rounded-lg hover:bg-gray-700 transition-colors text-sm"
               >
                 Archive
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-600 text-white px-4 py-3 min-h-[44px] rounded-lg hover:bg-red-700 transition-colors text-sm"
+              >
+                Delete
               </button>
             </div>
           </div>

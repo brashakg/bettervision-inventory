@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
+import { logActivity } from "@/lib/activityLog";
 
 export async function POST(
   request: NextRequest,
@@ -55,10 +56,46 @@ export async function POST(
       });
     }
 
+    // Also update variant-level inventory if variantId is set
+    for (const item of transfer.items) {
+      if (item.variantId) {
+        // Decrement from source
+        await prisma.variantLocation.updateMany({
+          where: { variantId: item.variantId, locationId: transfer.fromLocationId },
+          data: { quantity: { decrement: item.quantity } },
+        });
+        // Increment at destination
+        await prisma.variantLocation.upsert({
+          where: {
+            variantId_locationId: {
+              variantId: item.variantId,
+              locationId: transfer.toLocationId,
+            },
+          },
+          update: { quantity: { increment: item.quantity } },
+          create: {
+            variantId: item.variantId,
+            locationId: transfer.toLocationId,
+            quantity: item.quantity,
+          },
+        });
+      }
+    }
+
     const updated = await prisma.stockTransfer.update({
       where: { id },
       data: { status: "COMPLETED", completedAt: new Date() },
       include: { items: true },
+    });
+
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "COMPLETE",
+      entity: "STOCK_TRANSFER",
+      entityId: id,
+      details: `Completed transfer ${transfer.transferNumber}: ${transfer.items.length} items moved`,
     });
 
     return NextResponse.json({ success: true, data: updated });

@@ -147,6 +147,7 @@ function toTitleCase(text: string): string {
 // Tags format: "brand_burberry", "shape_square", "framecolor_orochiaro", etc.
 function parseTagsToFields(tags: string[]): {
   brand?: string;
+  subBrand?: string;
   shape?: string;
   frameColor?: string;
   templeColor?: string;
@@ -163,6 +164,10 @@ function parseTagsToFields(tags: string[]): {
   tint?: string;
   polarization?: string;
   uvProtection?: string;
+  lensMaterial?: string;
+  lensUSP?: string;
+  countryOfOrigin?: string;
+  productUSP?: string;
 } {
   const parsed: any = {};
 
@@ -208,8 +213,17 @@ function parseTagsToFields(tags: string[]): {
       parsed.polarization = toTitleCase(value);
     } else if (lowerPrefix === "uvprotection") {
       parsed.uvProtection = toTitleCase(value);
+    } else if (lowerPrefix === "lensmaterial") {
+      parsed.lensMaterial = toTitleCase(value);
+    } else if (lowerPrefix === "lensusp") {
+      parsed.lensUSP = toTitleCase(value);
+    } else if (lowerPrefix === "origin") {
+      parsed.countryOfOrigin = toTitleCase(value);
+    } else if (lowerPrefix === "productusp") {
+      parsed.productUSP = toTitleCase(value);
+    } else if (lowerPrefix === "subbrand") {
+      parsed.subBrand = toTitleCase(value);
     }
-    // Ignore: product_xxx, productusp_, lensusp_, lensmaterial_, origin_, other_xxx
   }
 
   return parsed;
@@ -334,6 +348,21 @@ async function upsertProduct(sp: ShopifyProductNode) {
   }
   if (parsedTags.uvProtection) {
     productData.uvProtection = parsedTags.uvProtection;
+  }
+  if (parsedTags.lensMaterial && !productData.lensMaterial) {
+    productData.lensMaterial = parsedTags.lensMaterial;
+  }
+  if (parsedTags.lensUSP) {
+    productData.lensUSP = parsedTags.lensUSP;
+  }
+  if (parsedTags.countryOfOrigin && !productData.countryOfOrigin) {
+    productData.countryOfOrigin = parsedTags.countryOfOrigin;
+  }
+  if (parsedTags.productUSP) {
+    productData.productUSP = parsedTags.productUSP;
+  }
+  if (parsedTags.subBrand) {
+    productData.subBrand = parsedTags.subBrand;
   }
 
   let productId: string;
