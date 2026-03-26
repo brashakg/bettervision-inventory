@@ -105,6 +105,7 @@ export interface CreateProductInput {
   seoTitle?: string;
   seoDescription?: string;
   tags?: string[];
+  productType?: string;
 }
 
 export interface CreateProductResult {
@@ -153,6 +154,7 @@ export async function createProduct(
     descriptionHtml: productData.description || "",
     tags: productData.tags || [],
     status: "ACTIVE",
+    productType: productData.productType || "",
     seo: {
       title: productData.seoTitle || productData.title,
       description: productData.seoDescription || "",
@@ -237,6 +239,7 @@ export interface UpdateProductInput {
   seoTitle?: string;
   seoDescription?: string;
   tags?: string[];
+  productType?: string;
 }
 
 export async function updateProduct(
@@ -256,6 +259,7 @@ export async function updateProduct(
   if (productData.title) input.title = productData.title;
   if (productData.description) input.descriptionHtml = productData.description;
   if (productData.tags) input.tags = productData.tags;
+  if (productData.productType !== undefined) input.productType = productData.productType;
 
   const seo: Record<string, string> = {};
   if (productData.seoTitle) seo.title = productData.seoTitle;

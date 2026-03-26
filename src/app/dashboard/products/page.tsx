@@ -262,7 +262,7 @@ export default function ProductsPage() {
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <SearchableDropdown
-              label="Category"
+              label="Product Type"
               options={CATEGORIES}
               value={category}
               onChange={setCategory}
@@ -409,7 +409,7 @@ export default function ProductsPage() {
                         Title
                       </th>
                       <th className="px-2 sm:px-6 py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                        Category
+                        Product Type
                       </th>
                       <th className="px-2 sm:px-6 py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
                         MRP

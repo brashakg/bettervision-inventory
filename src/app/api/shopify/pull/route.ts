@@ -222,7 +222,8 @@ async function upsertProduct(sp: ShopifyProductNode) {
     include: { variants: true, images: true },
   });
 
-  const category = guessCategory(sp);
+  // Use Shopify productType directly; fall back to guessing from tags/title
+  const category = sp.productType ? sp.productType.toUpperCase() : guessCategory(sp);
   const modelNo = getMetafield(sp, "custom", "model_no") || "";
 
   // Extract first variant price as base MRP

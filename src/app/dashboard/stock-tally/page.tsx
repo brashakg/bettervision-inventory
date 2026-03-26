@@ -144,7 +144,7 @@ export default function StockTallyPage() {
     if (!result) return;
     const loc = locations.find((l) => l.id === selectedLocation);
     let csv = `Stock Tally Report\nLocation: ${loc?.name || selectedLocation}\nDate: ${new Date().toLocaleDateString()}\n\n`;
-    csv += "PRODUCT COMPARISON\nBarcode,Product,Variant,Brand,Category,Physical,Online,Difference,Status\n";
+    csv += "PRODUCT COMPARISON\nBarcode,Product,Variant,Brand,Product Type,Physical,Online,Difference,Status\n";
     for (const i of result.comparisonData) {
       csv += `${i.barcode},${i.productTitle},${i.variantTitle || ""},${i.brand},${i.category},${i.physicalQty},${i.onlineQty},${i.difference},${i.status}\n`;
     }
@@ -153,7 +153,7 @@ export default function StockTallyPage() {
     }
     csv += "\nBRAND BREAKDOWN\nBrand,Physical,Online,Excess,Deficit\n";
     for (const b of result.brandBreakdown) csv += `${b.name},${b.totalPhysical},${b.totalOnline},${b.excess},${b.deficit}\n`;
-    csv += "\nCATEGORY BREAKDOWN\nCategory,Physical,Online,Excess,Deficit\n";
+    csv += "\nPRODUCT TYPE BREAKDOWN\nProduct Type,Physical,Online,Excess,Deficit\n";
     for (const c of result.categoryBreakdown) csv += `${c.name},${c.totalPhysical},${c.totalOnline},${c.excess},${c.deficit}\n`;
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -332,7 +332,7 @@ export default function StockTallyPage() {
                       <th className="text-left py-2.5 px-3 font-medium text-slate-600">Product</th>
                       <th className="text-left py-2.5 px-3 font-medium text-slate-600">Barcode</th>
                       <th className="text-left py-2.5 px-3 font-medium text-slate-600">Brand</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-slate-600">Category</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-slate-600">Product Type</th>
                       <th className="text-right py-2.5 px-3 font-medium text-slate-600">Physical</th>
                       <th className="text-right py-2.5 px-3 font-medium text-slate-600">Online</th>
                       <th className="text-right py-2.5 px-3 font-medium text-slate-600">Diff</th>
@@ -396,13 +396,13 @@ export default function StockTallyPage() {
                 </table>
               </div>
 
-              {/* Category */}
+              {/* Product Type */}
               <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-semibold text-slate-700 mb-3">Category-wise Breakdown</h2>
+                <h2 className="text-sm font-semibold text-slate-700 mb-3">Product Type Breakdown</h2>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-slate-50">
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Category</th>
+                      <th className="text-left py-2 px-3 font-medium text-slate-600">Product Type</th>
                       <th className="text-right py-2 px-3 font-medium text-slate-600">Physical</th>
                       <th className="text-right py-2 px-3 font-medium text-slate-600">Online</th>
                       <th className="text-right py-2 px-3 font-medium text-green-700">Excess</th>

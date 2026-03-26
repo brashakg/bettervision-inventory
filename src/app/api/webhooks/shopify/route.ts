@@ -106,7 +106,7 @@ async function handleProductCreateUpdate(payload: any) {
     title,
     status,
     brand,
-    category: guessCategory(payload),
+    category: payload.product_type ? payload.product_type.toUpperCase() : guessCategory(payload),
     htmlDescription: payload.body_html || null,
     tags,
     pageUrl: payload.handle || null,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Upload, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Upload, X, Loader2, AlertTriangle } from 'lucide-react';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import VariantManager from '@/components/VariantManager';
 import {
@@ -335,32 +335,6 @@ export default function NewProductPage() {
     }));
   };
 
-  const handleRemoveBg = async (index: number) => {
-    const imageUrl = formData.images[index];
-    if (!imageUrl) return;
-
-    setUploadingImage(true);
-    try {
-      const res = await fetch('/api/images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: imageUrl, removeBg: true }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        setFormData((prev) => {
-          const newImages = [...prev.images];
-          newImages[index] = data.url;
-          return { ...prev, images: newImages };
-        });
-      }
-    } catch (error) {
-      console.error('Error removing background:', error);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   const handleSubmit = async (
     e: React.FormEvent,
     status: 'DRAFT' | 'PUBLISHED'
@@ -511,7 +485,7 @@ export default function NewProductPage() {
               {/* Category Selector */}
               <div className="border-b border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Product Category
+                  Product Type
                 </h2>
                 <div className="flex gap-4">
                   {['SPECTACLES', 'SUNGLASSES', 'SOLUTIONS'].map((cat) => (
@@ -1059,15 +1033,6 @@ export default function NewProductPage() {
                           className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full hover:bg-red-700"
                         >
                           <X className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveBg(index)}
-                          disabled={uploadingImage}
-                          className="absolute bottom-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          <RotateCcw className="w-3 h-3 inline mr-1" />
-                          Remove BG
                         </button>
                       </div>
                     ))}

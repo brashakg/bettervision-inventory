@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, Search, Check, X } from 'lucide-react';
+import { Loader2, Search, Check, X, RefreshCw } from 'lucide-react';
 
 interface Customer {
   id: string;
@@ -29,8 +29,27 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const ITEMS_PER_PAGE = 10;
+
+  const handleSyncCustomers = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch('/api/customers/sync', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to sync customers');
+      setSyncMessage(data.message);
+      // Refresh list
+      setPage(1);
+    } catch (err: any) {
+      setError(err.message || 'Failed to sync customers');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Fetch stats
   useEffect(() => {
@@ -84,9 +103,23 @@ export default function CustomersPage() {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Customers</h1>
-          <p className="text-gray-600">Manage your customer base and analyze purchasing patterns</p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Customers</h1>
+            <p className="text-gray-600">Manage your customer base and analyze purchasing patterns</p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleSyncCustomers}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {syncing ? 'Syncing...' : 'Sync Customers from Shopify'}
+            </button>
+            {syncMessage && <p className="text-xs text-green-700">{syncMessage}</p>}
+          </div>
+        </div>
         </div>
 
         {/* Stats Cards */}
@@ -111,12 +144,6 @@ export default function CustomersPage() {
           </div>
         )}
 
-        {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-blue-900 text-sm">
-            <span className="font-semibold">Note:</span> Customers are automatically synced when orders are imported from Shopify. Use the Sync Orders button on the Orders page to update customer data.
-          </p>
-        </div>
 
         {/* Error Message */}
         {error && (

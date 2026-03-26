@@ -45,6 +45,7 @@ public/uploads/*
 .vscode/
 *.swp
 *.swo
+*.bak
 
 # standalone output
 .next/standalone/

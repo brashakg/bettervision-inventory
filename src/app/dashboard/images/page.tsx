@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Trash2 } from 'lucide-react';
 import SearchableDropdown from '@/components/SearchableDropdown';
 
 interface ProductImage {
@@ -27,7 +27,6 @@ export default function ImagesPage() {
   const [loading, setLoading] = useState(true);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [processingImages, setProcessingImages] = useState<Set<string>>(new Set());
 
   // Filters
   const [processedFilter, setProcessedFilter] = useState('All');
@@ -36,7 +35,6 @@ export default function ImagesPage() {
 
   // Modal state
   const [selectedImage, setSelectedImage] = useState<ProductImage | null>(null);
-  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
 
   // Fetch locations
   useEffect(() => {
@@ -92,56 +90,6 @@ export default function ImagesPage() {
       setSelectedImages(new Set(images.map((img) => img.id)));
     } else {
       setSelectedImages(new Set());
-    }
-  };
-
-  const handleRemoveBackground = async (imageId: string) => {
-    const image = images.find((img) => img.id === imageId);
-    if (!image) return;
-
-    setProcessingImages((prev) => new Set([...prev, imageId]));
-    try {
-      const res = await fetch('/api/images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: image.url,
-          removeBg: true,
-        }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        setProcessedImageUrl(data.url);
-        // Update the image in state
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId ? { ...img, processed: true, url: data.url } : img
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error removing background:', error);
-    } finally {
-      setProcessingImages((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(imageId);
-        return newSet;
-      });
-    }
-  };
-
-  const handleBulkRemoveBg = async () => {
-    const selectedImageArray = Array.from(selectedImages);
-    if (selectedImageArray.length === 0) return;
-
-    setProcessingImages(new Set(selectedImageArray));
-    try {
-      await Promise.all(
-        selectedImageArray.map((imageId) => handleRemoveBackground(imageId))
-      );
-      setSelectedImages(new Set());
-    } catch (error) {
-      console.error('Error processing images:', error);
     }
   };
 
@@ -240,15 +188,6 @@ export default function ImagesPage() {
                 }}
               />
             </div>
-            {selectedImages.size > 0 && (
-              <button
-                onClick={handleBulkRemoveBg}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Remove BG ({selectedImages.size})
-              </button>
-            )}
           </div>
 
           {selectedImages.size > 0 && (
@@ -284,7 +223,7 @@ export default function ImagesPage() {
                 <div
                   onClick={() => {
                     setSelectedImage(image);
-                    setProcessedImageUrl(image.processed ? image.url : null);
+                    ;
                   }}
                   className="relative h-48 overflow-hidden cursor-pointer bg-gray-200"
                 >
@@ -318,22 +257,6 @@ export default function ImagesPage() {
 
                 {/* Actions */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  {!image.processed && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveBackground(image.id);
-                      }}
-                      disabled={processingImages.has(image.id)}
-                      className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {processingImages.has(image.id) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -371,16 +294,6 @@ export default function ImagesPage() {
                 className="max-h-96 max-w-full object-contain"
               />
             </div>
-
-            {processedImageUrl && (
-              <div className="flex-1 flex items-center justify-center bg-gray-100">
-                <img
-                  src={processedImageUrl}
-                  alt="Processed"
-                  className="max-h-96 max-w-full object-contain"
-                />
-              </div>
-            )}
 
             <div className="p-4 bg-gray-50 overflow-y-auto">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
@@ -422,22 +335,6 @@ export default function ImagesPage() {
                   </p>
                 </div>
                 <div className="pt-2 border-t border-gray-200 flex gap-2">
-                  {!selectedImage.processed && (
-                    <button
-                      onClick={() => {
-                        handleRemoveBackground(selectedImage.id);
-                      }}
-                      disabled={processingImages.has(selectedImage.id)}
-                      className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-xs hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {processingImages.has(selectedImage.id) ? (
-                        <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-                      ) : (
-                        <RotateCcw className="w-3 h-3 inline mr-1" />
-                      )}
-                      Remove BG
-                    </button>
-                  )}
                   <button
                     onClick={() => handleDeleteImage(selectedImage.id)}
                     className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-xs hover:bg-red-700"
