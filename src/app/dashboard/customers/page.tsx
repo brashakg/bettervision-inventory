@@ -120,7 +120,6 @@ export default function CustomersPage() {
             {syncMessage && <p className="text-xs text-green-700">{syncMessage}</p>}
           </div>
         </div>
-        </div>
 
         {/* Stats Cards */}
         {stats && (
