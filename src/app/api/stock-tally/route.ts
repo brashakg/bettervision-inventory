@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
+import { logActivity } from "@/lib/activityLog";
 
 /**
  * POST /api/stock-tally
@@ -37,17 +38,12 @@ export async function POST(request: NextRequest) {
 
     const uniqueBarcodes = Array.from(barcodeQtyMap.keys());
 
-    // Look up variants by barcode field
-    const variants = await prisma.productVariant.findMany({
+    // Look up variants by barcode field, then fallback to SKU for unmatched
+    const variantsByBarcode = await prisma.productVariant.findMany({
       where: { barcode: { in: uniqueBarcodes } },
       include: {
         product: {
-          select: {
-            id: true,
-            title: true,
-            brand: true,
-            category: true,
-          },
+          select: { id: true, title: true, brand: true, category: true },
         },
         locations: {
           where: { locationId },
@@ -55,6 +51,27 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Find barcodes that didn't match — try them as SKUs
+    const matchedByBarcode = new Set(variantsByBarcode.map((v) => v.barcode!));
+    const unmatchedCodes = uniqueBarcodes.filter((b) => !matchedByBarcode.has(b));
+
+    const variantsBySku = unmatchedCodes.length > 0
+      ? await prisma.productVariant.findMany({
+          where: { sku: { in: unmatchedCodes } },
+          include: {
+            product: {
+              select: { id: true, title: true, brand: true, category: true },
+            },
+            locations: {
+              where: { locationId },
+              select: { quantity: true },
+            },
+          },
+        })
+      : [];
+
+    const variants = [...variantsByBarcode, ...variantsBySku];
 
     // Build comparison items
     interface ComparisonItem {
@@ -74,7 +91,9 @@ export async function POST(request: NextRequest) {
     const matchedBarcodes = new Set<string>();
 
     for (const v of variants) {
-      const bc = v.barcode!;
+      // Match by barcode or by SKU (for fallback matches)
+      const bc = v.barcode && barcodeQtyMap.has(v.barcode) ? v.barcode : v.sku && barcodeQtyMap.has(v.sku) ? v.sku : null;
+      if (!bc) continue;
       matchedBarcodes.add(bc);
       const physicalQty = barcodeQtyMap.get(bc) || 0;
       const onlineQty = v.locations.reduce((s, l) => s + l.quantity, 0);
@@ -133,6 +152,23 @@ export async function POST(request: NextRequest) {
       majorDifferences: comparisonData.filter((i) => i.status === "major").length,
       totalVariance: comparisonData.reduce((s, i) => s + Math.abs(i.difference), 0),
     };
+
+    // Log the tally activity
+    logActivity({
+      userId: (auth.session?.user as any)?.id,
+      userName: auth.session?.user?.name,
+      userEmail: auth.session?.user?.email,
+      action: "STOCK_TALLY",
+      entity: "STOCK_TRANSFER",
+      details: `Stock tally: ${summary.uniqueBarcodes} barcodes scanned, ${summary.matchedVariants} matched, ${summary.unmatchedCount} unmatched, ${summary.majorDifferences} major differences`,
+      metadata: JSON.stringify({
+        locationId,
+        totalScanned: summary.totalScanned,
+        matchedVariants: summary.matchedVariants,
+        unmatchedCount: summary.unmatchedCount,
+        totalVariance: summary.totalVariance,
+      }),
+    });
 
     return NextResponse.json({
       success: true,
