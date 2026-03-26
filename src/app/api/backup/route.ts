@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       products: Array<{
         sku: string;
         inventory?: Array<{ locationCode: string; quantity: number }>;
-        variants?: Array<{ sku: string; inventoryQuantity: number }>;
+        variants?: Array<{ sku: string; barcode?: string; inventoryQuantity: number }>;
       }>;
       restoreInventory: boolean;
     };
@@ -149,6 +149,20 @@ export async function POST(request: NextRequest) {
       }
 
       matched++;
+
+      // Restore variant barcodes if present
+      if (item.variants) {
+        for (const v of item.variants) {
+          if (v.sku && v.barcode) {
+            try {
+              await prisma.productVariant.updateMany({
+                where: { productId: product.id, sku: v.sku },
+                data: { barcode: v.barcode },
+              });
+            } catch { /* skip if variant not found */ }
+          }
+        }
+      }
 
       if (restoreInventory && item.inventory) {
         for (const inv of item.inventory) {

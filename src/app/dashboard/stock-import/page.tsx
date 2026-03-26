@@ -14,6 +14,7 @@ import {
 
 interface StockItem {
   sku: string;
+  barcode?: string;
   quantity: number;
 }
 
@@ -141,15 +142,16 @@ export default function BackupRestorePage() {
           if ((h === "QTY" || h === "QUANTITY") && qtyIdx === -1) qtyIdx = i;
           if ((h === "BARCODE" || h === "BAR CODE" || h === "BAR_CODE") && barcodeIdx === -1) barcodeIdx = i;
         }
-        // Allow barcode column as fallback for SKU
-        const identifierIdx = skuIdx !== -1 ? skuIdx : barcodeIdx;
-        if (identifierIdx === -1 || qtyIdx === -1) continue;
+        // Need at least one identifier column (SKU or Barcode) + quantity
+        if (skuIdx === -1 && barcodeIdx === -1) continue;
+        if (qtyIdx === -1) continue;
         for (let r = 1; r < rows.length; r++) {
           const row = rows[r];
-          const sku = String(row[identifierIdx] || "").trim();
-          if (!sku) continue;
+          const sku = skuIdx !== -1 ? String(row[skuIdx] || "").trim() : "";
+          const barcode = barcodeIdx !== -1 ? String(row[barcodeIdx] || "").trim() : "";
+          if (!sku && !barcode) continue;
           const qty = Number(row[qtyIdx]) || 0;
-          allItems.push({ sku, quantity: qty });
+          allItems.push({ sku: sku || barcode, barcode: barcode || undefined, quantity: qty });
         }
       }
       setStockItems(allItems);

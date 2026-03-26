@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items } = body as {
-      items: Array<{ sku: string; quantity: number }>;
+    const { items, locationId } = body as {
+      items: Array<{ sku: string; barcode?: string; quantity: number }>;
+      locationId?: string;
     };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -15,10 +16,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create the default SHOPIFY location
-    let location = await prisma.location.findFirst({
-      where: { code: "SHOPIFY" },
-    });
+    // Use provided location or default to SHOPIFY
+    let location;
+    if (locationId) {
+      location = await prisma.location.findUnique({ where: { id: locationId } });
+    }
+    if (!location) {
+      location = await prisma.location.findFirst({ where: { code: "SHOPIFY" } });
+    }
     if (!location) {
       location = await prisma.location.create({
         data: {
@@ -40,45 +45,113 @@ export async function POST(request: NextRequest) {
     const BATCH_SIZE = 50;
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
-      const skus = batch.map((item) => item.sku);
+      const skus = batch.map((item) => item.sku).filter(Boolean);
+      const barcodes = batch.map((item) => item.barcode).filter(Boolean) as string[];
 
-      // Find products by SKU
-      const products = await prisma.product.findMany({
-        where: { sku: { in: skus } },
-        select: { id: true, sku: true },
-      });
+      // Search across product SKU, variant SKU, and variant barcode
+      const [productsBySku, variantsBySku, variantsByBarcode] = await Promise.all([
+        skus.length > 0
+          ? prisma.product.findMany({
+              where: { sku: { in: skus } },
+              select: { id: true, sku: true },
+            })
+          : [],
+        skus.length > 0
+          ? prisma.productVariant.findMany({
+              where: { sku: { in: skus } },
+              select: { id: true, sku: true, productId: true },
+            })
+          : [],
+        barcodes.length > 0
+          ? prisma.productVariant.findMany({
+              where: { barcode: { in: barcodes } },
+              select: { id: true, barcode: true, productId: true },
+            })
+          : [],
+      ]);
 
-      const skuToProduct = new Map(products.map((p) => [p.sku, p.id]));
+      // Build lookup maps
+      const skuToProductId = new Map(productsBySku.map((p) => [p.sku, p.id]));
+      const skuToVariant = new Map(variantsBySku.map((v) => [v.sku, v]));
+      const barcodeToVariant = new Map(variantsByBarcode.map((v) => [v.barcode, v]));
 
       for (const item of batch) {
-        const productId = skuToProduct.get(item.sku);
-        if (!productId) {
-          notFound++;
-          if (notFoundSkus.length < 20) {
-            notFoundSkus.push(item.sku);
-          }
-          continue;
-        }
+        // Try matching in order: variant barcode > variant SKU > product SKU
+        const variantByBarcode = item.barcode ? barcodeToVariant.get(item.barcode) : null;
+        const variantBySku = skuToVariant.get(item.sku);
+        const productId = skuToProductId.get(item.sku);
 
-        matched++;
-        try {
-          await prisma.productLocation.upsert({
-            where: {
-              productId_locationId: {
+        if (variantByBarcode) {
+          // Match by barcode — update variant-level inventory
+          matched++;
+          try {
+            await prisma.variantLocation.upsert({
+              where: {
+                variantId_locationId: {
+                  variantId: variantByBarcode.id,
+                  locationId: location.id,
+                },
+              },
+              update: { quantity: item.quantity },
+              create: {
+                variantId: variantByBarcode.id,
+                locationId: location.id,
+                quantity: item.quantity,
+              },
+            });
+            updated++;
+          } catch (err: any) {
+            errors.push(`Barcode ${item.barcode}: ${err.message}`);
+          }
+        } else if (variantBySku) {
+          // Match by variant SKU — update variant-level inventory
+          matched++;
+          try {
+            await prisma.variantLocation.upsert({
+              where: {
+                variantId_locationId: {
+                  variantId: variantBySku.id,
+                  locationId: location.id,
+                },
+              },
+              update: { quantity: item.quantity },
+              create: {
+                variantId: variantBySku.id,
+                locationId: location.id,
+                quantity: item.quantity,
+              },
+            });
+            updated++;
+          } catch (err: any) {
+            errors.push(`SKU ${item.sku}: ${err.message}`);
+          }
+        } else if (productId) {
+          // Fallback: match by product SKU — update product-level inventory
+          matched++;
+          try {
+            await prisma.productLocation.upsert({
+              where: {
+                productId_locationId: {
+                  productId,
+                  locationId: location.id,
+                },
+              },
+              update: { quantity: item.quantity },
+              create: {
                 productId,
                 locationId: location.id,
+                quantity: item.quantity,
               },
-            },
-            update: { quantity: item.quantity },
-            create: {
-              productId,
-              locationId: location.id,
-              quantity: item.quantity,
-            },
-          });
-          updated++;
-        } catch (err: any) {
-          errors.push(`SKU ${item.sku}: ${err.message}`);
+            });
+            updated++;
+          } catch (err: any) {
+            errors.push(`SKU ${item.sku}: ${err.message}`);
+          }
+        } else {
+          notFound++;
+          if (notFoundSkus.length < 20) {
+            notFoundSkus.push(item.barcode || item.sku);
+          }
         }
       }
     }
