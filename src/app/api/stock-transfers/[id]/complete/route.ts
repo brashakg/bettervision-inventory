@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { logActivity } from "@/lib/activityLog";
+import { updateInventory, fetchShopifyLocations } from "@/lib/shopify";
 
 export async function POST(
   request: NextRequest,
@@ -88,6 +89,66 @@ export async function POST(
       include: { items: true },
     });
 
+    // ── Sync inventory changes to Shopify ──
+    // Look up Shopify location IDs for source and destination
+    const [fromLoc, toLoc] = await Promise.all([
+      prisma.location.findUnique({ where: { id: transfer.fromLocationId } }),
+      prisma.location.findUnique({ where: { id: transfer.toLocationId } }),
+    ]);
+
+    // Auto-map locations if needed
+    if (fromLoc || toLoc) {
+      const needsMapping = (fromLoc && !fromLoc.shopifyLocationId) || (toLoc && !toLoc.shopifyLocationId);
+      if (needsMapping) {
+        const shopifyLocs = await fetchShopifyLocations().catch(() => ({ success: false as const }));
+        if (shopifyLocs.success && shopifyLocs.locations) {
+          for (const sl of shopifyLocs.locations) {
+            // Match by name similarity
+            const slName = sl.name.toLowerCase();
+            if (fromLoc && !fromLoc.shopifyLocationId && fromLoc.name.toLowerCase().includes(slName)) {
+              await prisma.location.update({ where: { id: fromLoc.id }, data: { shopifyLocationId: sl.id } });
+              fromLoc.shopifyLocationId = sl.id;
+            }
+            if (toLoc && !toLoc.shopifyLocationId && toLoc.name.toLowerCase().includes(slName)) {
+              await prisma.location.update({ where: { id: toLoc.id }, data: { shopifyLocationId: sl.id } });
+              toLoc.shopifyLocationId = sl.id;
+            }
+          }
+        }
+      }
+    }
+
+    // Sync variant inventory to Shopify for both locations
+    let shopifySyncCount = 0;
+    for (const item of transfer.items) {
+      if (!item.variantId) continue;
+
+      const variant = await prisma.productVariant.findUnique({
+        where: { id: item.variantId },
+      });
+      if (!variant?.shopifyInventoryItemId) continue;
+
+      // Decrement from source Shopify location
+      if (fromLoc?.shopifyLocationId) {
+        await updateInventory(
+          variant.shopifyInventoryItemId,
+          fromLoc.shopifyLocationId,
+          -item.quantity
+        ).catch(() => {});
+        shopifySyncCount++;
+      }
+
+      // Increment at destination Shopify location
+      if (toLoc?.shopifyLocationId) {
+        await updateInventory(
+          variant.shopifyInventoryItemId,
+          toLoc.shopifyLocationId,
+          item.quantity
+        ).catch(() => {});
+        shopifySyncCount++;
+      }
+    }
+
     logActivity({
       userId: (auth.session?.user as any)?.id,
       userName: auth.session?.user?.name,
@@ -95,7 +156,7 @@ export async function POST(
       action: "COMPLETE",
       entity: "STOCK_TRANSFER",
       entityId: id,
-      details: `Completed transfer ${transfer.transferNumber}: ${transfer.items.length} items moved`,
+      details: `Completed transfer ${transfer.transferNumber}: ${transfer.items.length} items moved${shopifySyncCount > 0 ? `, ${shopifySyncCount} Shopify inventory adjustments` : ""}`,
     });
 
     return NextResponse.json({ success: true, data: updated });

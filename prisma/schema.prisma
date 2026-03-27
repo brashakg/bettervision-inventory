@@ -21,16 +21,17 @@ model User {
 }
 
 model Location {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  address   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
-  products  ProductLocation[]
-  variants  VariantLocation[]
+  id                String   @id @default(cuid())
+  name              String
+  code              String   @unique
+  address           String?
+  isActive          Boolean  @default(true)
+  shopifyLocationId String?  // Shopify location GID for inventory sync
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  users             User[]
+  products          ProductLocation[]
+  variants          VariantLocation[]
 }
 
 model AttributeType {
@@ -185,7 +186,8 @@ model ProductVariant {
   title   String?          // e.g. "086 / 55" or "Black / 55"
 
   // Shopify sync
-  shopifyVariantId String?
+  shopifyVariantId      String?
+  shopifyInventoryItemId String?  // Shopify inventory item GID for stock sync
 
   // Relations
   images    VariantImage[]

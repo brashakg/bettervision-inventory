@@ -402,6 +402,96 @@ export async function updateInventory(
   return { success: true, message: "Inventory updated successfully" };
 }
 
+// ─── SET INVENTORY (absolute quantity) ─────────────────
+
+export async function setInventory(
+  inventoryItemId: string,
+  locationId: string,
+  quantity: number
+): Promise<{ success: boolean; message: string }> {
+  const mutation = `
+    mutation SetQuantities($input: InventorySetQuantitiesInput!) {
+      inventorySetQuantities(input: $input) {
+        inventoryAdjustmentGroup { createdAt reason }
+        userErrors { field message code }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{
+    inventorySetQuantities: {
+      inventoryAdjustmentGroup: Record<string, unknown> | null;
+      userErrors: Array<{ field: string; message: string; code: string }>;
+    };
+  }>(mutation, {
+    input: {
+      reason: "CORRECTION",
+      name: "available",
+      quantities: [
+        {
+          inventoryItemId,
+          locationId,
+          quantity,
+        },
+      ],
+    },
+  });
+
+  if (!result.success) {
+    return { success: false, message: result.error || "Failed to set inventory" };
+  }
+  const errors = result.data?.inventorySetQuantities.userErrors || [];
+  if (errors.length > 0) {
+    return { success: false, message: errors.map((e) => `${e.field}: ${e.message}`).join("; ") };
+  }
+  return { success: true, message: "Inventory set successfully" };
+}
+
+// ─── FETCH SHOPIFY LOCATIONS ──────────────────────────
+
+export interface ShopifyLocation {
+  id: string;
+  name: string;
+  address: { formatted: string[] };
+  isActive: boolean;
+}
+
+export async function fetchShopifyLocations(): Promise<{
+  success: boolean;
+  locations?: ShopifyLocation[];
+  error?: string;
+}> {
+  const query = `
+    query FetchLocations {
+      locations(first: 50) {
+        edges {
+          node {
+            id
+            name
+            address { formatted }
+            isActive
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await makeGraphQLRequest<{
+    locations: {
+      edges: Array<{ node: ShopifyLocation }>;
+    };
+  }>(query);
+
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "Failed to fetch locations" };
+  }
+
+  return {
+    success: true,
+    locations: result.data.locations.edges.map((e) => e.node),
+  };
+}
+
 // ─── DELETE PRODUCT ────────────────────────────────────
 
 export async function deleteProduct(

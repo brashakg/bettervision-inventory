@@ -60,13 +60,9 @@ function guessCategory(product: ShopifyProductNode): string {
   return "SPECTACLES";
 }
 
-// Helper: convert hyphenated/lowercase text to title case
-// Handles compound words like "fullframe" -> "Full Frame", "orochiaro" -> "Orochiaro"
-function toTitleCase(text: string): string {
-  if (!text) return "";
-
-  // Special compound word mappings (frame attributes + brand names)
-  const compoundWords: { [key: string]: string } = {
+// Special compound word mappings (frame attributes + brand names)
+// Shared across multiple helpers
+const compoundWords: { [key: string]: string } = {
     // Frame attributes
     fullframe: "Full Frame",
     halfrim: "Half Rim",
@@ -129,7 +125,12 @@ function toTitleCase(text: string): string {
     marksmith: "Mark Smith",
     davidjones: "David Jones",
     "bettervision": "Better Vision",
-  };
+};
+
+// Helper: convert hyphenated/lowercase text to title case
+// Handles compound words like "fullframe" -> "Full Frame", "orochiaro" -> "Orochiaro"
+function toTitleCase(text: string): string {
+  if (!text) return "";
 
   // Check for exact matches first
   if (compoundWords[text.toLowerCase()]) {
@@ -250,14 +251,31 @@ async function upsertProduct(sp: ShopifyProductNode) {
   // Parse tags to extract structured fields
   const parsedTags = parseTagsToFields(sp.tags);
 
-  // Brand priority: tag (brand_boss) > metafield > vendor (skip store name "Better Vision")
+  // Brand priority: tag (brand_boss) > metafield > vendor
+  // If vendor is the store name "Better Vision", try to extract brand from title
   const vendorName = sp.vendor || "";
   const isStoreName = vendorName.toLowerCase().includes("better vision") || vendorName.toLowerCase().includes("bettervision");
+
+  // Try to extract brand from the first word(s) of the title via compound word lookup
+  let titleBrand = "";
+  if (sp.title) {
+    const titleWords = sp.title.split(/\s+/);
+    // Try first two words, then first word
+    const twoWordKey = titleWords.slice(0, 2).join("").toLowerCase();
+    const oneWordKey = titleWords[0]?.toLowerCase() || "";
+    if (compoundWords[twoWordKey]) {
+      titleBrand = compoundWords[twoWordKey];
+    } else if (compoundWords[oneWordKey]) {
+      titleBrand = compoundWords[oneWordKey];
+    }
+  }
+
   const brand =
     parsedTags.brand ||
     getMetafield(sp, "custom", "brand") ||
-    (isStoreName ? "" : vendorName) ||
-    "Unknown";
+    (isStoreName ? titleBrand : vendorName) ||
+    vendorName ||
+    "";
 
   // Try to extract model number from title if metafield is empty
   // Titles are often "BOSS 1234" or "PRADA PR 54XV" — strip the brand prefix
@@ -428,6 +446,7 @@ async function upsertProduct(sp: ShopifyProductNode) {
             compareAtPrice: parseFloat(sv.compareAtPrice || sv.price || "0"),
             barcode: sv.barcode || null,
             title: sv.title,
+            shopifyInventoryItemId: sv.inventoryItem?.id || null,
           },
         });
       }
@@ -453,6 +472,7 @@ async function upsertProduct(sp: ShopifyProductNode) {
           where: { id: existingByCode.id },
           data: {
             shopifyVariantId: sv.id,
+            shopifyInventoryItemId: sv.inventoryItem?.id || null,
             mrp: parseFloat(sv.compareAtPrice || sv.price || "0"),
             discountedPrice: parseFloat(sv.price || "0"),
             compareAtPrice: parseFloat(sv.compareAtPrice || sv.price || "0"),
@@ -467,6 +487,7 @@ async function upsertProduct(sp: ShopifyProductNode) {
             data: {
               productId,
               shopifyVariantId: sv.id,
+              shopifyInventoryItemId: sv.inventoryItem?.id || null,
               colorCode,
               frameSize,
               mrp: parseFloat(sv.compareAtPrice || sv.price || "0"),

@@ -27,6 +27,12 @@ export async function GET(
         images: true,
         locations: true,
         syncLogs: true,
+        variants: {
+          include: {
+            images: true,
+            locations: { include: { location: true } },
+          },
+        },
       },
     });
 
@@ -63,6 +69,7 @@ export async function PUT(
 
     const product = await prisma.product.findUnique({
       where: { id: params.id },
+      include: { variants: true },
     });
 
     if (!product) {
