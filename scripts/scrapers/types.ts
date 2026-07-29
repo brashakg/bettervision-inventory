@@ -20,8 +20,9 @@ export interface ScrapedVariant {
   weight?: string;
   lensColour?: string;
   tint?: string;
+  /** Only MRP is carried over — selling price comes from the IMS discount
+   *  rules at import time, never from the source site's sale price. */
   mrp: number;
-  discountedPrice?: number;
   /** GTIN/EAN — maps to ProductVariant.barcode (synced to Shopify). */
   barcode?: string;
 }
@@ -46,13 +47,14 @@ export interface ScrapedProduct {
   lensMaterial?: string;
   uvProtection?: string;
   polarization?: string;
-  productUSP?: string;
-  description?: string;
+  /** Only MRP is carried over — see ScrapedVariant.mrp. */
   mrp: number;
-  discountedPrice?: number;
-  /** Absolute image URLs, in display order. */
+  /** Absolute source image URLs, in display order. The importer downloads,
+   *  strips metadata, resizes to the app's 2048px standard, and re-hosts
+   *  them — these URLs never enter the database as-is. */
   images: string[];
   variant: ScrapedVariant;
-  /** Source-specific extras kept for debugging/audit; not imported into columns. */
+  /** Source-specific extras (sale price, promo tags, marketing copy, stock)
+   *  kept for debugging/audit only; never imported into columns. */
   raw?: Record<string, unknown>;
 }

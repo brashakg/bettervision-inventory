@@ -138,7 +138,6 @@ function normalize(url: string, nextData: any): ScrapedProduct {
   const images = gallery.map((rel: string) => `${mediaBase}${rel.startsWith("/") ? "" : "/"}${rel}`);
 
   const mrp = Number(p.mrp_price || p.price || 0);
-  const finalPrice = Number(p.final_price || 0) || mrp;
 
   // Titan sells one colorway per PDP (other colors are separate SKUs), so
   // each scrape yields one product with a single variant. The colour name
@@ -163,10 +162,7 @@ function normalize(url: string, nextData: any): ScrapedProduct {
     lensMaterial: clean(p.lens_material),
     uvProtection: clean(pd.uv_protection) || clean(pd.lens_feature),
     polarization: clean(pd.polarized) || clean(pd.polarised),
-    productUSP: clean(p.short_offer_tag?.[0]),
-    description: clean(p.description),
     mrp,
-    discountedPrice: finalPrice,
     images,
     variant: {
       colorCode: colorName,
@@ -181,10 +177,14 @@ function normalize(url: string, nextData: any): ScrapedProduct {
       weight: clean(pd.weight),
       lensColour: clean(p.lens_colour),
       mrp,
-      discountedPrice: finalPrice,
       barcode: clean(p.ean_code),
     },
+    // Audit-only extras — the importer never writes these to columns.
+    // Titan's sale price, promo tags ("Buy One Get One Free"), and
+    // marketing copy stay out of the IMS per catalogue policy.
     raw: {
+      sourceFinalPrice: Number(p.final_price || 0) || undefined,
+      sourceOfferTags: Array.isArray(p.short_offer_tag) ? p.short_offer_tag : undefined,
       stockQty: Number(p.sellable_quantity ?? p.qty ?? 0),
       titanCategory: p.product_category,
       scrapedAt: new Date().toISOString(),

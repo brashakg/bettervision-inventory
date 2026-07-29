@@ -34,17 +34,53 @@ HTTPS goes through a proxy, prefix with
 ## Importer (`../import-scraped.ts`)
 
 ```bash
-DATABASE_URL="postgresql://..." npx tsx scripts/import-scraped.ts scripts/scrapers/output/titan-eyeplus.json [--dry-run] [--update]
+DATABASE_URL="postgresql://..." npx tsx scripts/import-scraped.ts scripts/scrapers/output/titan-eyeplus.json [--dry-run] [--update] [--keep-source-images]
 ```
 
 - Reuses `src/lib/autoGenerate` — titles, SKUs, SEO fields, tags, and
   discount rules come out identical to the dashboard's Add Product flow.
 - Products are created as `DRAFT`, **never pushed to Shopify** — review in
   the dashboard, then publish through the normal flow.
+- **MRP only**: the source site's sale price is never imported. Selling
+  price comes from the IMS category × brand discount rules, same as a
+  hand-catalogued product. (No matching rule → SRP = MRP.)
+- **Source marketing stays out**: promo tags ("Buy One Get One Free"),
+  sale prices, and marketing copy are kept in the JSON's `raw` block for
+  audit but never written to product columns.
+- **Images are re-processed before entering the IMS**: downloaded,
+  stripped of all EXIF/ICC/XMP metadata, resized to the app's 2048×2048
+  standard (never enlarged), re-encoded as JPEG q85, and uploaded to the
+  Shopify CDN via the app's `uploadFileToShopify` (falls back to
+  `public/uploads/` when Shopify credentials aren't set, e.g. local dev).
+  The source URL is kept as `originalUrl` for audit. Use
+  `--keep-source-images` to hotlink instead for quick preview runs.
 - Dedupes on brand + modelNo (case-insensitive). Re-runs skip existing
   products; `--update` refreshes prices on them instead.
-- Images reference the source CDN URLs (`originalUrl` kept for audit).
 - Each import writes a `SyncLog` entry recording the source URL.
+
+## Running against production (from your machine)
+
+```bash
+git checkout main && git pull        # after the PR is merged
+npm install
+
+# 1. Scrape (no credentials needed):
+npx tsx scripts/scrapers/titan-eyeplus.ts --count 10
+
+# 2. Preview what would be imported (needs the Railway DATABASE_URL):
+DATABASE_URL="postgresql://...railway..." \
+  npx tsx scripts/import-scraped.ts scripts/scrapers/output/titan-eyeplus.json --dry-run
+
+# 3. Import for real. Add Shopify credentials so processed images land on
+#    the Shopify CDN instead of the ephemeral local filesystem:
+DATABASE_URL="postgresql://...railway..." \
+SHOPIFY_STORE_URL="bokaro-better-vision.myshopify.com" \
+SHOPIFY_ACCESS_TOKEN="shpat_..." \
+  npx tsx scripts/import-scraped.ts scripts/scrapers/output/titan-eyeplus.json
+```
+
+Then review the DRAFT products in the dashboard and publish through the
+normal flow. Re-running an import is safe — existing products are skipped.
 
 ## Adding a new source
 
@@ -57,8 +93,9 @@ DATABASE_URL="postgresql://..." npx tsx scripts/import-scraped.ts scripts/scrape
 ## Data-source notes
 
 - Product **specs** are factual data; product **images/copy** are the
-  brands'. Titan Eye+ images are used here as placeholders for review —
-  for publishing at scale, prefer official distributor feeds (Luxottica /
-  Safilo / Titan dealer portals) or confirm retailer image rights.
+  brands'. Source marketing copy and promo tags are never imported, and
+  images are re-processed — but for publishing at scale, prefer official
+  distributor feeds (Luxottica / Safilo / Titan dealer portals) or confirm
+  retailer image rights.
 - Scrapers break silently when sites redesign; the Titan adapter fails
   loudly (non-zero exit + per-URL errors) if `__NEXT_DATA__` disappears.

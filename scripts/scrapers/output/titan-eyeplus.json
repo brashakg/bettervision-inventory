@@ -14,10 +14,7 @@
     "gender": "Women",
     "countryOfOrigin": "China",
     "warranty": "6 months",
-    "productUSP": "[",
-    "description": "Black Rectangle Rimmed Eyeglasses from Titan Eye+. These are compatible with Blue filter, Single vision & Progressive Lenses. (E1396B1A1)",
     "mrp": 1800,
-    "discountedPrice": 1800,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/e/1/e1396b1a1_1_lar_1.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/e/1/e1396b1a1_3_lar_1.jpg",
@@ -35,13 +32,13 @@
       "templeLength": "140",
       "weight": "0.000000",
       "mrp": 1800,
-      "discountedPrice": 1800,
       "barcode": "E1396B1A1V"
     },
     "raw": {
+      "sourceFinalPrice": 1800,
       "stockQty": 8,
       "titanCategory": "Eyeglasses",
-      "scrapedAt": "2026-07-29T13:53:47.577Z"
+      "scrapedAt": "2026-07-29T14:01:37.335Z"
     }
   },
   {
@@ -59,10 +56,7 @@
     "gender": "Men",
     "countryOfOrigin": "China",
     "warranty": "2 Years",
-    "productUSP": "[",
-    "description": "Green Aviator Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (RB3026IW202762).",
     "mrp": 7790,
-    "discountedPrice": 7790,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/r/b/rb3026iw202762_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/r/b/rb3026iw202762_3_lar.jpg",
@@ -79,13 +73,13 @@
       "weight": "0.000000",
       "lensColour": "Green",
       "mrp": 7790,
-      "discountedPrice": 7790,
       "barcode": "SRB3026IW202762"
     },
     "raw": {
+      "sourceFinalPrice": 7790,
       "stockQty": 9,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:48.656Z"
+      "scrapedAt": "2026-07-29T14:01:38.216Z"
     }
   },
   {
@@ -103,10 +97,7 @@
     "gender": "Unisex",
     "countryOfOrigin": "China",
     "warranty": "6 months",
-    "productUSP": "[",
-    "description": "Black Square Rimmed Eyeglasses from Titan Eye+. These are compatible with Blue filter, Single vision & Progressive Lenses. (FT1001G1A1)",
     "mrp": 2700,
-    "discountedPrice": 2700,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/f/t/ft1001g1a1_1_lar_1.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/f/t/ft1001g1a1_3_lar_1.jpg",
@@ -125,13 +116,13 @@
       "templeLength": "145",
       "weight": "0.000000",
       "mrp": 2700,
-      "discountedPrice": 2700,
       "barcode": "FT1001G1A1V"
     },
     "raw": {
+      "sourceFinalPrice": 2700,
       "stockQty": 12,
       "titanCategory": "Eyeglasses",
-      "scrapedAt": "2026-07-29T13:53:49.775Z"
+      "scrapedAt": "2026-07-29T14:01:39.099Z"
     }
   },
   {
@@ -149,10 +140,7 @@
     "gender": "Women",
     "countryOfOrigin": "China",
     "warranty": "24 months",
-    "productUSP": "[",
-    "description": "Brown CatEye Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (SVO5435SIW6561355).",
     "mrp": 3890,
-    "discountedPrice": 3890,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/S/V/SVO5435SIW6561355_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/S/V/SVO5435SIW6561355_3_lar.jpg",
@@ -170,13 +158,13 @@
       "weight": "0.100000",
       "lensColour": "Brown",
       "mrp": 3890,
-      "discountedPrice": 3890,
       "barcode": "SVO5435SIW6561355"
     },
     "raw": {
+      "sourceFinalPrice": 3890,
       "stockQty": 84,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:50.885Z"
+      "scrapedAt": "2026-07-29T14:01:39.966Z"
     }
   },
   {
@@ -192,10 +180,7 @@
     "templeMaterial": "742",
     "frameType": "Rimmed",
     "gender": "Women",
-    "productUSP": "[",
-    "description": "Purple Round Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (GC280PR2F).",
     "mrp": 4400,
-    "discountedPrice": 4400,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/g/c/gc280pr2f_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/g/c/gc280pr2f_3_lar.jpg",
@@ -212,13 +197,13 @@
       "weight": "0.000000",
       "lensColour": "Black",
       "mrp": 4400,
-      "discountedPrice": 4400,
       "barcode": "GC280PR2FV"
     },
     "raw": {
+      "sourceFinalPrice": 4400,
       "stockQty": 25,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:51.982Z"
+      "scrapedAt": "2026-07-29T14:01:41.075Z"
     }
   },
   {
@@ -236,9 +221,7 @@
     "gender": "Men",
     "countryOfOrigin": "China",
     "warranty": "12 months",
-    "productUSP": "[",
     "mrp": 8490,
-    "discountedPrice": 8490,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/F/T/FTH2241FLC551_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/F/T/FTH2241FLC551_3_lar.jpg",
@@ -258,13 +241,13 @@
       "templeLength": "135",
       "weight": "0.100000",
       "mrp": 8490,
-      "discountedPrice": 8490,
       "barcode": "FTH2241FLC551"
     },
     "raw": {
+      "sourceFinalPrice": 8490,
       "stockQty": 1,
       "titanCategory": "Eyeglasses",
-      "scrapedAt": "2026-07-29T13:53:53.056Z"
+      "scrapedAt": "2026-07-29T14:01:41.962Z"
     }
   },
   {
@@ -282,10 +265,7 @@
     "gender": "Unisex",
     "countryOfOrigin": "United States",
     "warranty": "1 Year",
-    "productUSP": "[",
-    "description": "Grey Rectangle Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (SMJ0220AA).",
     "mrp": 16990,
-    "discountedPrice": 16990,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/S/M/SMJ0220AA_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/S/M/SMJ0220AA_3_lar.jpg",
@@ -309,13 +289,13 @@
       "weight": "0.000000",
       "lensColour": "Grey",
       "mrp": 16990,
-      "discountedPrice": 16990,
       "barcode": "SMJ0220AA"
     },
     "raw": {
+      "sourceFinalPrice": 16990,
       "stockQty": 13,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:54.200Z"
+      "scrapedAt": "2026-07-29T14:01:42.822Z"
     }
   },
   {
@@ -333,10 +313,7 @@
     "gender": "Men",
     "countryOfOrigin": "China",
     "warranty": "6 months",
-    "productUSP": "[",
-    "description": "White Wraparound Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (P117WH3).",
     "mrp": 1700,
-    "discountedPrice": 1700,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/p/1/p117wh3_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/p/1/p117wh3_3_lar.jpg",
@@ -356,13 +333,13 @@
       "weight": "0.000000",
       "lensColour": "Transparent",
       "mrp": 1700,
-      "discountedPrice": 1700,
       "barcode": "P117WH3V"
     },
     "raw": {
+      "sourceFinalPrice": 1700,
       "stockQty": 238,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:55.286Z"
+      "scrapedAt": "2026-07-29T14:01:43.702Z"
     }
   },
   {
@@ -379,10 +356,7 @@
     "frameType": "Rimmed",
     "gender": "Men",
     "warranty": "2 Years",
-    "productUSP": "[",
-    "description": "Black Square Sunglasses from Titan Eye+. Shades are designed to save your eyes from harmful UV rays while providing best in class style. (OK941794170259).",
     "mrp": 11090,
-    "discountedPrice": 11090,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/o/k/ok941794170259_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/o/k/ok941794170259_3_lar.jpg",
@@ -400,13 +374,13 @@
       "weight": "0.000000",
       "lensColour": "Grey",
       "mrp": 11090,
-      "discountedPrice": 11090,
       "barcode": "SOK941794170259"
     },
     "raw": {
+      "sourceFinalPrice": 11090,
       "stockQty": 2,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:56.390Z"
+      "scrapedAt": "2026-07-29T14:01:44.817Z"
     }
   },
   {
@@ -423,9 +397,7 @@
     "gender": "Men",
     "countryOfOrigin": "Italy",
     "warranty": "24 months",
-    "productUSP": "[",
     "mrp": 36390,
-    "discountedPrice": 36390,
     "images": [
       "https://api.titaneyeplus.com/media/catalog/product/S/P/SPR02ZS17N20N52_1_lar.jpg",
       "https://api.titaneyeplus.com/media/catalog/product/S/P/SPR02ZS17N20N52_3_lar.jpg",
@@ -444,13 +416,13 @@
       "weight": "0.100000",
       "lensColour": "Blue",
       "mrp": 36390,
-      "discountedPrice": 36390,
       "barcode": "SPR02ZS17N20N52"
     },
     "raw": {
+      "sourceFinalPrice": 36390,
       "stockQty": 2,
       "titanCategory": "Sunglasses",
-      "scrapedAt": "2026-07-29T13:53:57.495Z"
+      "scrapedAt": "2026-07-29T14:01:45.682Z"
     }
   }
 ]
