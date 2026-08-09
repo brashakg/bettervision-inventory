@@ -1,0 +1,25 @@
+{%- comment -%}
+  BV PATCH: FAQPage structured data, generated dynamically from page content.
+  Renders only on pages whose handle contains 'faq' and whose content uses the
+  <h3>Question</h3> ... answer ... convention. Stays in sync automatically when
+  the merchant edits the FAQ page — no hardcoded questions.
+  Rendered from sections/main-page.liquid.
+{%- endcomment -%}
+{%- if page.handle contains 'faq' and page.content contains '<h3>' -%}
+  {%- assign bv_chunks = page.content | split: '<h3>' -%}
+  <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+    {%- assign bv_first = true -%}
+    {%- for bv_chunk in bv_chunks offset: 1 -%}
+      {%- assign bv_parts = bv_chunk | split: '</h3>' -%}
+      {%- assign bv_q = bv_parts[0] | strip_html | strip -%}
+      {%- assign bv_a = bv_parts[1] | split: '<h2>' | first | strip_html | strip -%}
+      {%- if bv_q != '' and bv_a != '' -%}
+        {%- unless bv_first -%},{%- endunless -%}
+        {"@type":"Question","name":{{ bv_q | json }},"acceptedAnswer":{"@type":"Answer","text":{{ bv_a | json }}}}
+        {%- assign bv_first = false -%}
+      {%- endif -%}
+    {%- endfor -%}
+    ]}
+  </script>
+{%- endif -%}
